@@ -1,34 +1,20 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
+  
 }
 
 datasource db {
-  provider = "postgresql"
-  url = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// Definição da Tabela (Model)
 model Imovel {
   id          Int      @id @default(autoincrement())
-  titulo      String
-  descricao   String?  @db.Text // String longa
-  tipo        String   // Ex: Apartamento, Casa
-  valor       Decimal  @db.Decimal(15, 2)
-  quartos     Int
-  vagas       Int
-  areaTotal   Float?
-  
-  // Controle Interno
-  disponivel  Boolean  @default(true)
-  destaque    Boolean  @default(false)
-  
-  // Integração DWV
-  dwvId       String?  @unique // ID externo para evitar duplicação
-  
+  title       String   
+  value       Decimal  @db.Decimal(15, 2)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@map("imoveis") // Nome da tabela no banco
-} 
+  @@map("imoveis") 
+}
