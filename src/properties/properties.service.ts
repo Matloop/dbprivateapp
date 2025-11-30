@@ -19,18 +19,28 @@ export class PropertiesService {
   }
 
   findAll() {
-    return `This action returns all properties`;
+    return this.prisma.imovel.findMany();
   }
 
   findOne(id: number) {
-    return `This action returns a #${id} property`;
+    return this.prisma.imovel.findUnique(
+      {where: {id}}
+    );
   }
 
   update(id: number, updatePropertyDto: UpdatePropertyDto) {
-    return `This action updates a #${id} property`;
+    return this.prisma.imovel.update({
+      where: {id: id,},
+      data: {
+        title : updatePropertyDto.title,
+        value : updatePropertyDto.value
+      }
+    }) 
   }
 
   remove(id: number) {
-    return `This action removes a #${id} property`;
+    return this.prisma.imovel.delete({
+      where : {id}
+    });
   }
 }
