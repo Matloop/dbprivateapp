@@ -9,14 +9,33 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model Imovel {
-  id          Int      @id @default(autoincrement())
-  title       String   
-  value       Decimal  @db.Decimal(15, 2)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Property {
+  id           String   @id @default(uuid()) @db.Uuid
+  value        number
+  // 1 e 2. Referências
+  reference    String   @unique // Ex: "REF-187"
+  oldReference String?  // Pode ser nulo
+  
+  // 3. Título
+  title        String
+  
+  // 4 e 5. Booleans (Checkboxes simples)
+  showOnSite   Boolean  @default(false) @map("show_on_site")
+  isExclusive  Boolean  @default(false) @map("is_exclusive")
+  
+  // 6. Finalidade (Array de strings pois pode ser Venda E Aluguel)
+  // Ex: ["SALE", "RENT_ANNUAL"]
+  finality     String[] 
+  
+  // 7. Tipo de Imóvel (String única)
+  // Ex: "APARTMENT"
+  type         String   
 
-  @@map("imoveis") 
+  // Auditoria
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("properties")
 }
 
 model User {

@@ -5,38 +5,52 @@ export declare class PropertiesController {
     private readonly propertiesService;
     constructor(propertiesService: PropertiesService);
     create(createPropertyDto: CreatePropertyDto): Promise<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: import("@prisma/client/runtime/library").Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }>;
     findAll(): import(".prisma/client").Prisma.PrismaPromise<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: import("@prisma/client/runtime/library").Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }[]>;
-    findOne(id: string): import(".prisma/client").Prisma.Prisma__ImovelClient<{
+    findOne(id: string): import(".prisma/client").Prisma.Prisma__PropertyClient<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: import("@prisma/client/runtime/library").Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     } | null, null, import("@prisma/client/runtime/library").DefaultArgs>;
-    update(id: string, updatePropertyDto: UpdatePropertyDto): import(".prisma/client").Prisma.Prisma__ImovelClient<{
+    update(id: string, updatePropertyDto: UpdatePropertyDto): import(".prisma/client").Prisma.Prisma__PropertyClient<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: import("@prisma/client/runtime/library").Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }, never, import("@prisma/client/runtime/library").DefaultArgs>;
-    remove(id: string): import(".prisma/client").Prisma.Prisma__ImovelClient<{
-        title: string;
-        value: import("@prisma/client/runtime/library").Decimal;
-        createdAt: Date;
-        updatedAt: Date;
-        id: number;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs>;
+    remove(id: string): any;
 }

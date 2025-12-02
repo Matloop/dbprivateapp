@@ -6,38 +6,52 @@ export declare class PropertiesService {
     private readonly prisma;
     constructor(prisma: PrismaService);
     create(createPropertyDto: CreatePropertyDto): Promise<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: Prisma.Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }>;
     findAll(): Prisma.PrismaPromise<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: Prisma.Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }[]>;
-    findOne(id: number): Prisma.Prisma__ImovelClient<{
+    findOne(id: number): Prisma.Prisma__PropertyClient<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: Prisma.Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     } | null, null, import("@prisma/client/runtime/library").DefaultArgs>;
-    update(id: number, updatePropertyDto: UpdatePropertyDto): Prisma.Prisma__ImovelClient<{
+    update(id: number, updatePropertyDto: UpdatePropertyDto): Prisma.Prisma__PropertyClient<{
+        id: string;
+        reference: string;
+        oldReference: string | null;
         title: string;
-        value: Prisma.Decimal;
+        showOnSite: boolean;
+        isExclusive: boolean;
+        finality: string[];
+        type: string;
         createdAt: Date;
         updatedAt: Date;
-        id: number;
     }, never, import("@prisma/client/runtime/library").DefaultArgs>;
-    remove(id: number): Prisma.Prisma__ImovelClient<{
-        title: string;
-        value: Prisma.Decimal;
-        createdAt: Date;
-        updatedAt: Date;
-        id: number;
-    }, never, import("@prisma/client/runtime/library").DefaultArgs>;
+    remove(id: number): any;
 }

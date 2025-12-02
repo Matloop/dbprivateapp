@@ -10,26 +10,31 @@ export class PropertiesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createPropertyDto: CreatePropertyDto) {
-    return await this.prisma.imovel.create({
+    return await this.prisma.property.create({
       data: {
         title: createPropertyDto.title,
-        value: createPropertyDto.value
+        reference : createPropertyDto.reference,
+        showOnSite : createPropertyDto.showOnSite,
+        finality : createPropertyDto.finality,
+        isExclusive : createPropertyDto.isExclusive,
+        value: createPropertyDto.value,
+
       }
     });
   }
 
   findAll() {
-    return this.prisma.imovel.findMany();
+    return this.prisma.property.findMany();
   }
 
   findOne(id: number) {
-    return this.prisma.imovel.findUnique(
+    return this.prisma.property.findUnique(
       {where: {id}}
     );
   }
 
   update(id: number, updatePropertyDto: UpdatePropertyDto) {
-    return this.prisma.imovel.update({
+    return this.prisma.property.update({
       where: {id: id,},
       data: {
         title : updatePropertyDto.title,

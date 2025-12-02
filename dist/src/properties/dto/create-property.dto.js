@@ -13,17 +13,43 @@ exports.CreatePropertyDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreatePropertyDto {
+    reference;
+    oldReference;
     title;
+    showOnSite;
+    isExclusive;
+    finality;
     value;
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String }, value: { required: true, type: () => Number, minimum: 0 } };
+        return { reference: { required: true, type: () => String }, oldReference: { required: false, type: () => String }, title: { required: true, type: () => String }, showOnSite: { required: true, type: () => Boolean }, isExclusive: { required: true, type: () => Object }, finality: { required: true, type: () => [String] }, value: { required: true, type: () => Number, minimum: 0 } };
     }
 }
 exports.CreatePropertyDto = CreatePropertyDto;
 __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
+], CreatePropertyDto.prototype, "reference", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreatePropertyDto.prototype, "oldReference", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreatePropertyDto.prototype, "showOnSite", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Object)
+], CreatePropertyDto.prototype, "isExclusive", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], CreatePropertyDto.prototype, "finality", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.Min)(0, { message: 'não pode ser meno que 0' }),
