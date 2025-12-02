@@ -9,33 +9,131 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// 1. Enumerações (Mantemos iguais, pois organizam os dados)
+enum PropertyCategory {
+  APARTAMENTO
+  CASA
+  GALPAO
+  SALA_COMERCIAL
+  COBERTURA
+  SITIO
+  VEICULO
+  HOTEL
+  DIFERENCIADO
+  EMBARCACAO
+  TERRENO
+}
+
+enum TransactionType {
+  VENDA
+  LOCACAO
+}
+
+enum PropertyStatus {
+  DISPONIVEL
+  RESERVADO
+  VENDIDO
+  ALUGADO
+}
+
+// 2. Modelo Principal
 model Property {
-  id           String   @id @default(uuid()) @db.Uuid
-  value        number
-  // 1 e 2. Referências
-  reference    String   @unique // Ex: "REF-187"
-  oldReference String?  // Pode ser nulo
-  
-  // 3. Título
-  title        String
-  
-  // 4 e 5. Booleans (Checkboxes simples)
-  showOnSite   Boolean  @default(false) @map("show_on_site")
-  isExclusive  Boolean  @default(false) @map("is_exclusive")
-  
-  // 6. Finalidade (Array de strings pois pode ser Venda E Aluguel)
-  // Ex: ["SALE", "RENT_ANNUAL"]
-  finality     String[] 
-  
-  // 7. Tipo de Imóvel (String única)
-  // Ex: "APARTMENT"
-  type         String   
+  // MUDANÇA AQUI: Int + autoincrement
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  // Auditoria
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  showOnSite   Boolean 
+  isExclusive  Boolean
 
-  @@map("properties")
+  // --- Informações Básicas ---
+  title             String  // "Nome do exclusivo"
+  subtitle          String? // "Subtítulo"
+  category          PropertyCategory
+  transactionType   TransactionType @default(VENDA)
+  exclusivityDocUrl String? // Link do PDF de autorização
+
+  // --- Localização (Relacionamento 1:1) ---
+  address   Address? @relation(fields: [addressId], references: [id])
+  addressId Int?     @unique // Agora é Int para bater com o ID do Address
+
+  // --- Datas ---
+  constructionStartDate DateTime?
+  deliveryDate          DateTime?
+
+  // --- Características Numéricas ---
+  bedrooms    Int     @default(0)
+  suites      Int     @default(0)
+  bathrooms   Int     @default(0)
+  garageSpots Int     @default(0)
+  
+  registrationNumber String? // Matrícula (String pois pode ter letras ou zeros a esquerda)
+  
+  // Áreas
+  garageArea  Float?
+  privateArea Float
+  totalArea   Float?
+
+  // --- Valores (Decimal é obrigatório para dinheiro) ---
+  price     Decimal  @db.Decimal(15, 2)
+  condoFee  Decimal? @db.Decimal(10, 2)
+  iptuPrice Decimal? @db.Decimal(10, 2)
+
+  // --- Descrição e Extras ---
+  description String?   @db.Text
+  features    Feature[] // Relacionamento N:N
+
+  // --- Galeria ---
+  images PropertyImage[]
+
+  // --- Condições de Pagamento ---
+  paymentConditions PaymentCondition[]
+
+  // --- Controle Interno ---
+  brokerNotes String?        @db.Text
+  status      PropertyStatus @default(DISPONIVEL)
+}
+
+// 3. Endereço
+model Address {
+  id           Int     @id @default(autoincrement())
+  state        String
+  city         String
+  neighborhood String
+  street       String
+  number       String
+  complement   String?
+  zipCode      String
+
+  property Property?
+}
+
+// 4. Imagens
+model PropertyImage {
+  id      Int     @id @default(autoincrement())
+  url     String
+  isCover Boolean @default(false)
+
+  propertyId Int // FK agora é Int
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+// 5. Características (Checkbox: Academia, Piscina...)
+model Feature {
+  id   Int    @id @default(autoincrement())
+  name String @unique // Garante que não tenha duas "Piscina" cadastradas
+
+  properties Property[]
+}
+
+// 6. Condições de Pagamento
+model PaymentCondition {
+  id          Int      @id @default(autoincrement())
+  description String
+  value       Decimal? @db.Decimal(15, 2)
+
+  propertyId Int
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
 model User {
