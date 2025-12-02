@@ -77,20 +77,31 @@ export class PropertiesService {
     });
   }
 
-  findAll() {
+  async findAll() {
+    
     return this.prisma.property.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        address: true,
-        //traz apenas imagem da capa para performance
-        images: {
-          where: { isCover: true},
-          take: 1,
+      orderBy: { createdAt: 'desc' },
+      // SELECIONE APENAS O QUE A TABELA MOSTRA
+      select: {
+        id: true,
+        title: true,
+        subtitle: true,
+        price: true,
+        category: true,
+        status: true,
+        createdAt: true,
+        // Trazendo endereço
+        address: {
+          select: { city: true, state: true, neighborhood: true }
         },
-        features : true,
-      }
+        // Trazendo SÓ a imagem de capa (url)
+        images: {
+          where: { isCover: true },
+          take: 1,
+          select: { url: true, isCover: true }
+        }
+        
+      },
     });
   }
 

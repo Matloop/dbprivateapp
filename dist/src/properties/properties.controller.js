@@ -28,7 +28,12 @@ let PropertiesController = class PropertiesController {
     create(createPropertyDto) {
         return this.propertiesService.create(createPropertyDto);
     }
-    findAll() {
+    async findAll() {
+        console.time('AUTH_ATE_CONTROLLER');
+        console.log('1. Passou pelo Auth Guard');
+        const result = await this.propertiesService.findAll();
+        console.log('2. Prisma retornou dados');
+        console.timeEnd('AUTH_ATE_CONTROLLER');
         return this.propertiesService.findAll();
     }
     findOne(id) {
@@ -52,11 +57,12 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "create", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
-    openapi.ApiResponse({ status: 200, type: [Object] }),
+    openapi.ApiResponse({ status: 200 }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], PropertiesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)(':id'),

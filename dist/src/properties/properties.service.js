@@ -66,19 +66,26 @@ let PropertiesService = class PropertiesService {
             }
         });
     }
-    findAll() {
+    async findAll() {
         return this.prisma.property.findMany({
-            orderBy: {
-                createdAt: 'desc',
-            },
-            include: {
-                address: true,
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                title: true,
+                subtitle: true,
+                price: true,
+                category: true,
+                status: true,
+                createdAt: true,
+                address: {
+                    select: { city: true, state: true, neighborhood: true }
+                },
                 images: {
                     where: { isCover: true },
                     take: 1,
-                },
-                features: true,
-            }
+                    select: { url: true, isCover: true }
+                }
+            },
         });
     }
     async findOne(id) {

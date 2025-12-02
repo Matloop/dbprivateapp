@@ -15,9 +15,18 @@ export class PropertiesController {
   create(@Body() createPropertyDto: CreatePropertyDto) {
     return this.propertiesService.create(createPropertyDto);
   }
-
+  
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
+  async findAll() {
+    console.time('AUTH_ATE_CONTROLLER'); 
+    console.log('1. Passou pelo Auth Guard'); // Vai aparecer instantâneo
+
+    const result = await this.propertiesService.findAll();
+  
+    console.log('2. Prisma retornou dados'); // Vai demorar 5 segundos para aparecer
+    console.timeEnd('AUTH_ATE_CONTROLLER');
+  
     return this.propertiesService.findAll();
   }
 
