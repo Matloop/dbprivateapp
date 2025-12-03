@@ -4,7 +4,7 @@ import { CreatePropertyDto, PropertyCategory, TransactionType } from './dto/crea
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
-
+import sharp from 'sharp';
 @Injectable()
 export class PropertiesService {
 
@@ -237,94 +237,130 @@ export class PropertiesService {
   // ===========================================================================
   // IMPORTAR DO DWV
   // ===========================================================================
+  // ===========================================================================
+  // IMPORTAR DO DWV (ATUALIZADO COM SEPARAÇÃO DE CARACTERÍSTICAS)
+  // ===========================================================================
   async importFromDwv(dwvUrl: string) {
-    console.log(`--- IMPORTAÇÃO DWV: ${dwvUrl} ---`);
+    console.log(`--- IMPORTAÇÃO OTIMIZADA: ${dwvUrl} ---`);
 
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-    // 1. FETCH NATIVO
+    // 1. BAIXAR HTML
     let html = '';
     try {
       const response = await fetch(dwvUrl, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
       html = await response.text();
     } catch (e) {
-      throw new Error("Erro ao baixar site.");
+      throw new Error("Erro ao baixar site. Verifique a URL.");
     }
 
     const $ = cheerio.load(html);
 
-    // 2. EXTRAIR DADOS
+    // 2. EXTRAIR DADOS (Igual ao anterior)
     const building = $('h2').first().text().trim();
     const unit = $('p').first().text().trim();
     const title = building ? `${building} ${unit}` : ($('title').text() || "Imóvel DWV");
-    
+
     let price = 0;
-    $('h1, h2').each((_, el) => {
-        const txt = $(el).text();
-        if (txt.includes('R$') && price === 0) {
-             price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
-        }
+    $('h1, h2, h3').each((_, el) => {
+      const txt = $(el).text();
+      if (txt.includes('R$') && price === 0) {
+        price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
+      }
     });
 
     let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0;
     $('div').each((_, el) => {
-        const label = $(el).find('p').text().toLowerCase();
-        const value = parseFloat($(el).find('h2').text().replace(',', '.'));
-        if (!isNaN(value)) {
-            if (label.includes('dorm')) bedrooms = value;
-            if (label.includes('suítes')) suites = value;
-            if (label.includes('vagas')) garageSpots = value;
-            if (label.includes('privati')) privateArea = value;
-        }
+      const label = $(el).find('p, span, small').text().toLowerCase();
+      const valueTxt = $(el).find('h2, h3, strong').text().replace(',', '.');
+      const value = parseFloat(valueTxt);
+      if (!isNaN(value)) {
+        if (label.includes('dorm')) bedrooms = value;
+        if (label.includes('suítes')) suites = value;
+        if (label.includes('vagas')) garageSpots = value;
+        if (label.includes('privati')) privateArea = value;
+      }
     });
 
-    // 3. IMAGENS
+    // 3. EXTRAIR FEATURES (Igual ao anterior)
+    const propertyFeatures: string[] = [];
+    const developmentFeatures: string[] = [];
+    $('h3, h4, h5, h6, strong, p').each((_, el) => {
+      const text = $(el).text().toLowerCase().trim();
+      const isUnitSection = text.includes('apartamento') || text.includes('imóvel') || text.includes('unidade');
+      const isDevSection = text.includes('empreendimento') || text.includes('lazer') || text.includes('condomínio');
+
+      if (isUnitSection || isDevSection) {
+        let $nextContainer = $(el).next();
+        if (!$nextContainer.is('ul') && !$nextContainer.is('div')) {
+            $nextContainer = $nextContainer.next();
+        }
+        const items: string[] = [];
+        $nextContainer.find('li, p, span').each((_, item) => {
+            const feat = $(item).text().trim();
+            if (feat.length > 2 && !feat.includes('R$')) items.push(feat);
+        });
+        if (isUnitSection) propertyFeatures.push(...items);
+        else if (isDevSection) developmentFeatures.push(...items);
+      }
+    });
+
+    const uniquePropertyFeatures = [...new Set(propertyFeatures)];
+    const uniqueDevelopmentFeatures = [...new Set(developmentFeatures)];
+
+    // 4. BAIXAR E COMPRIMIR IMAGENS (AQUI ESTÁ A MÁGICA)
     const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
     const matches = html.match(regex) || [];
     const uniqueUrls = [...new Set(matches)].filter(u => 
         !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25
     );
 
-    console.log(`Imagens encontradas: ${uniqueUrls.length}`);
-    const urlsToProcess = uniqueUrls.slice(0, 20); // Limite de 20 fotos
+    const urlsToProcess = uniqueUrls.slice(0, 20);
     const processedImages: { url: string; isCover: boolean }[] = [];
 
     for (let i = 0; i < urlsToProcess.length; i++) {
       try {
-        const url = urlsToProcess[i];
-        const imgResp = await fetch(url);
+        const imgUrl = urlsToProcess[i];
+        const imgResp = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!imgResp.ok) continue;
 
         const arrayBuffer = await imgResp.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        if (buffer.length < 5000) continue; // Ignora ícones pequenos
+        if (buffer.length < 5000) continue;
 
-        const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
+        // --- COMPRESSÃO COM SHARP ---
+        // Muda extensão para .webp
+        const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.webp`;
         const filePath = path.join(uploadDir, randomName);
 
-        fs.writeFileSync(filePath, buffer);
+        await sharp(buffer)
+          .resize(1280, 960, { // Redimensiona se for gigante (HD é suficiente)
+             fit: 'inside', 
+             withoutEnlargement: true 
+          }) 
+          .webp({ quality: 80 }) // Converte para WebP com 80% qualidade
+          .toFile(filePath);
 
         processedImages.push({
             url: `http://127.0.0.1:3000/uploads/${randomName}`,
             isCover: processedImages.length === 0 
         });
       } catch (err) {
-        console.log(`Erro ao baixar imagem: Ignorando.`);
+        console.log(`Erro ao processar imagem: ${err}`);
       }
     }
 
-    // 4. CRIAR DTO E SALVAR
-    // Nota: Como não sabemos distinguir o que é privativo ou comum na importação,
-    // salvamos uma tag genérica em developmentFeatures
+    // 5. SALVAR NO BANCO
     const createDto: CreatePropertyDto = {
       title: title,
-      description: `Importado de: ${dwvUrl}`,
+      subtitle: building,
+      description: `Importado via DWV: ${dwvUrl}`,
       category: PropertyCategory.APARTAMENTO,
       transactionType: TransactionType.VENDA,
       price: price,
@@ -334,11 +370,13 @@ export class PropertiesService {
       privateArea,
       showOnSite: true,
       isExclusive: false,
-      propertyFeatures: [],
-      developmentFeatures: ["Importado DWV"],
+      condoFee: 0,
+      iptuPrice: 0,
+      propertyFeatures: uniquePropertyFeatures,
+      developmentFeatures: uniqueDevelopmentFeatures,
       images: processedImages,
       address: {
-        street: "Importado (Verificar)", number: "S/N", neighborhood: "Centro", 
+        street: "Importado", number: "S/N", neighborhood: "Centro", 
         city: "Balneário Camboriú", state: "SC", zipCode: "88330-000"
       }
     };

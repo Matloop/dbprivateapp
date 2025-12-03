@@ -41,6 +41,9 @@ var __importStar = (this && this.__importStar) || (function () {
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PropertiesService = void 0;
 const common_1 = require("@nestjs/common");
@@ -49,6 +52,7 @@ const create_property_dto_1 = require("./dto/create-property.dto");
 const cheerio = __importStar(require("cheerio"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const sharp_1 = __importDefault(require("sharp"));
 let PropertiesService = class PropertiesService {
     prisma;
     constructor(prisma) {
@@ -215,7 +219,7 @@ let PropertiesService = class PropertiesService {
         });
     }
     async importFromDwv(dwvUrl) {
-        console.log(`--- IMPORTAÇÃO DWV: ${dwvUrl} ---`);
+        console.log(`--- IMPORTAÇÃO OTIMIZADA: ${dwvUrl} ---`);
         const uploadDir = path.join(process.cwd(), 'uploads');
         if (!fs.existsSync(uploadDir))
             fs.mkdirSync(uploadDir, { recursive: true });
@@ -229,14 +233,14 @@ let PropertiesService = class PropertiesService {
             html = await response.text();
         }
         catch (e) {
-            throw new Error("Erro ao baixar site.");
+            throw new Error("Erro ao baixar site. Verifique a URL.");
         }
         const $ = cheerio.load(html);
         const building = $('h2').first().text().trim();
         const unit = $('p').first().text().trim();
         const title = building ? `${building} ${unit}` : ($('title').text() || "Imóvel DWV");
         let price = 0;
-        $('h1, h2').each((_, el) => {
+        $('h1, h2, h3').each((_, el) => {
             const txt = $(el).text();
             if (txt.includes('R$') && price === 0) {
                 price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
@@ -244,8 +248,9 @@ let PropertiesService = class PropertiesService {
         });
         let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0;
         $('div').each((_, el) => {
-            const label = $(el).find('p').text().toLowerCase();
-            const value = parseFloat($(el).find('h2').text().replace(',', '.'));
+            const label = $(el).find('p, span, small').text().toLowerCase();
+            const valueTxt = $(el).find('h2, h3, strong').text().replace(',', '.');
+            const value = parseFloat(valueTxt);
             if (!isNaN(value)) {
                 if (label.includes('dorm'))
                     bedrooms = value;
@@ -257,37 +262,68 @@ let PropertiesService = class PropertiesService {
                     privateArea = value;
             }
         });
+        const propertyFeatures = [];
+        const developmentFeatures = [];
+        $('h3, h4, h5, h6, strong, p').each((_, el) => {
+            const text = $(el).text().toLowerCase().trim();
+            const isUnitSection = text.includes('apartamento') || text.includes('imóvel') || text.includes('unidade');
+            const isDevSection = text.includes('empreendimento') || text.includes('lazer') || text.includes('condomínio');
+            if (isUnitSection || isDevSection) {
+                let $nextContainer = $(el).next();
+                if (!$nextContainer.is('ul') && !$nextContainer.is('div')) {
+                    $nextContainer = $nextContainer.next();
+                }
+                const items = [];
+                $nextContainer.find('li, p, span').each((_, item) => {
+                    const feat = $(item).text().trim();
+                    if (feat.length > 2 && !feat.includes('R$'))
+                        items.push(feat);
+                });
+                if (isUnitSection)
+                    propertyFeatures.push(...items);
+                else if (isDevSection)
+                    developmentFeatures.push(...items);
+            }
+        });
+        const uniquePropertyFeatures = [...new Set(propertyFeatures)];
+        const uniqueDevelopmentFeatures = [...new Set(developmentFeatures)];
         const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
         const matches = html.match(regex) || [];
         const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25);
-        console.log(`Imagens encontradas: ${uniqueUrls.length}`);
         const urlsToProcess = uniqueUrls.slice(0, 20);
         const processedImages = [];
         for (let i = 0; i < urlsToProcess.length; i++) {
             try {
-                const url = urlsToProcess[i];
-                const imgResp = await fetch(url);
+                const imgUrl = urlsToProcess[i];
+                const imgResp = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
                 if (!imgResp.ok)
                     continue;
                 const arrayBuffer = await imgResp.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
                 if (buffer.length < 5000)
                     continue;
-                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
+                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.webp`;
                 const filePath = path.join(uploadDir, randomName);
-                fs.writeFileSync(filePath, buffer);
+                await (0, sharp_1.default)(buffer)
+                    .resize(1280, 960, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                    .webp({ quality: 80 })
+                    .toFile(filePath);
                 processedImages.push({
                     url: `http://127.0.0.1:3000/uploads/${randomName}`,
                     isCover: processedImages.length === 0
                 });
             }
             catch (err) {
-                console.log(`Erro ao baixar imagem: Ignorando.`);
+                console.log(`Erro ao processar imagem: ${err}`);
             }
         }
         const createDto = {
             title: title,
-            description: `Importado de: ${dwvUrl}`,
+            subtitle: building,
+            description: `Importado via DWV: ${dwvUrl}`,
             category: create_property_dto_1.PropertyCategory.APARTAMENTO,
             transactionType: create_property_dto_1.TransactionType.VENDA,
             price: price,
@@ -297,11 +333,13 @@ let PropertiesService = class PropertiesService {
             privateArea,
             showOnSite: true,
             isExclusive: false,
-            propertyFeatures: [],
-            developmentFeatures: ["Importado DWV"],
+            condoFee: 0,
+            iptuPrice: 0,
+            propertyFeatures: uniquePropertyFeatures,
+            developmentFeatures: uniqueDevelopmentFeatures,
             images: processedImages,
             address: {
-                street: "Importado (Verificar)", number: "S/N", neighborhood: "Centro",
+                street: "Importado", number: "S/N", neighborhood: "Centro",
                 city: "Balneário Camboriú", state: "SC", zipCode: "88330-000"
             }
         };
