@@ -6,271 +6,287 @@ export declare class PropertiesService {
     create(createPropertyDto: CreatePropertyDto): Promise<{
         address: {
             number: string;
+            id: number;
+            state: string;
+            city: string;
+            neighborhood: string;
             street: string;
             complement: string | null;
-            neighborhood: string;
-            city: string;
-            state: string;
             zipCode: string;
-            id: number;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
         images: {
+            id: number;
             url: string;
             isCover: boolean;
-            id: number;
             propertyId: number;
         }[];
         paymentConditions: {
             description: string;
-            value: import("@prisma/client/runtime/library").Decimal | null;
             id: number;
             propertyId: number;
+            value: import("@prisma/client/runtime/library").Decimal | null;
         }[];
     } & {
-        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        showOnSite: boolean;
+        isExclusive: boolean;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
-        registrationNumber: string | null;
-        price: import("@prisma/client/runtime/library").Decimal;
-        condoFee: import("@prisma/client/runtime/library").Decimal | null;
-        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        constructionStartDate: Date | null;
+        deliveryDate: Date | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
         garageSpots: number;
+        registrationNumber: string | null;
+        garageArea: number | null;
         privateArea: number;
         totalArea: number | null;
-        garageArea: number | null;
-        constructionStartDate: Date | null;
-        deliveryDate: Date | null;
+        price: import("@prisma/client/runtime/library").Decimal;
+        condoFee: import("@prisma/client/runtime/library").Decimal | null;
+        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        description: string | null;
         brokerNotes: string | null;
         status: import(".prisma/client").$Enums.PropertyStatus;
-        isExclusive: boolean;
-        showOnSite: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         id: number;
         addressId: number | null;
     }>;
     findAll(): Promise<{
-        address: {
-            neighborhood: string;
-            city: string;
-            state: string;
-        } | null;
+        createdAt: Date;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         price: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.PropertyStatus;
+        address: {
+            state: string;
+            city: string;
+            neighborhood: string;
+        } | null;
         images: {
             url: string;
             isCover: boolean;
         }[];
-        createdAt: Date;
         id: number;
     }[]>;
     findOne(id: number): Promise<{
         address: {
             number: string;
+            id: number;
+            state: string;
+            city: string;
+            neighborhood: string;
             street: string;
             complement: string | null;
-            neighborhood: string;
-            city: string;
-            state: string;
             zipCode: string;
-            id: number;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
         images: {
+            id: number;
             url: string;
             isCover: boolean;
-            id: number;
             propertyId: number;
         }[];
         paymentConditions: {
             description: string;
-            value: import("@prisma/client/runtime/library").Decimal | null;
             id: number;
             propertyId: number;
+            value: import("@prisma/client/runtime/library").Decimal | null;
         }[];
     } & {
-        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        showOnSite: boolean;
+        isExclusive: boolean;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
-        registrationNumber: string | null;
-        price: import("@prisma/client/runtime/library").Decimal;
-        condoFee: import("@prisma/client/runtime/library").Decimal | null;
-        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        constructionStartDate: Date | null;
+        deliveryDate: Date | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
         garageSpots: number;
+        registrationNumber: string | null;
+        garageArea: number | null;
         privateArea: number;
         totalArea: number | null;
-        garageArea: number | null;
-        constructionStartDate: Date | null;
-        deliveryDate: Date | null;
+        price: import("@prisma/client/runtime/library").Decimal;
+        condoFee: import("@prisma/client/runtime/library").Decimal | null;
+        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        description: string | null;
         brokerNotes: string | null;
         status: import(".prisma/client").$Enums.PropertyStatus;
-        isExclusive: boolean;
-        showOnSite: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         id: number;
         addressId: number | null;
     }>;
     update(id: number, updatePropertyDto: any): Promise<{
         address: {
             number: string;
+            id: number;
+            state: string;
+            city: string;
+            neighborhood: string;
             street: string;
             complement: string | null;
-            neighborhood: string;
-            city: string;
-            state: string;
             zipCode: string;
-            id: number;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
         images: {
+            id: number;
             url: string;
             isCover: boolean;
-            id: number;
             propertyId: number;
         }[];
         paymentConditions: {
             description: string;
-            value: import("@prisma/client/runtime/library").Decimal | null;
             id: number;
             propertyId: number;
+            value: import("@prisma/client/runtime/library").Decimal | null;
         }[];
     } & {
-        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        showOnSite: boolean;
+        isExclusive: boolean;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
-        registrationNumber: string | null;
-        price: import("@prisma/client/runtime/library").Decimal;
-        condoFee: import("@prisma/client/runtime/library").Decimal | null;
-        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        constructionStartDate: Date | null;
+        deliveryDate: Date | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
         garageSpots: number;
+        registrationNumber: string | null;
+        garageArea: number | null;
         privateArea: number;
         totalArea: number | null;
-        garageArea: number | null;
-        constructionStartDate: Date | null;
-        deliveryDate: Date | null;
+        price: import("@prisma/client/runtime/library").Decimal;
+        condoFee: import("@prisma/client/runtime/library").Decimal | null;
+        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        description: string | null;
         brokerNotes: string | null;
         status: import(".prisma/client").$Enums.PropertyStatus;
-        isExclusive: boolean;
-        showOnSite: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         id: number;
         addressId: number | null;
     }>;
     remove(id: number): Promise<{
-        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        showOnSite: boolean;
+        isExclusive: boolean;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
-        registrationNumber: string | null;
-        price: import("@prisma/client/runtime/library").Decimal;
-        condoFee: import("@prisma/client/runtime/library").Decimal | null;
-        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        constructionStartDate: Date | null;
+        deliveryDate: Date | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
         garageSpots: number;
+        registrationNumber: string | null;
+        garageArea: number | null;
         privateArea: number;
         totalArea: number | null;
-        garageArea: number | null;
-        constructionStartDate: Date | null;
-        deliveryDate: Date | null;
+        price: import("@prisma/client/runtime/library").Decimal;
+        condoFee: import("@prisma/client/runtime/library").Decimal | null;
+        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        description: string | null;
         brokerNotes: string | null;
         status: import(".prisma/client").$Enums.PropertyStatus;
-        isExclusive: boolean;
-        showOnSite: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         id: number;
         addressId: number | null;
     }>;
     importFromDwv(dwvUrl: string): Promise<{
         address: {
             number: string;
+            id: number;
+            state: string;
+            city: string;
+            neighborhood: string;
             street: string;
             complement: string | null;
-            neighborhood: string;
-            city: string;
-            state: string;
             zipCode: string;
-            id: number;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
         images: {
+            id: number;
             url: string;
             isCover: boolean;
-            id: number;
             propertyId: number;
         }[];
         paymentConditions: {
             description: string;
-            value: import("@prisma/client/runtime/library").Decimal | null;
             id: number;
             propertyId: number;
+            value: import("@prisma/client/runtime/library").Decimal | null;
         }[];
     } & {
-        description: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        showOnSite: boolean;
+        isExclusive: boolean;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
-        registrationNumber: string | null;
-        price: import("@prisma/client/runtime/library").Decimal;
-        condoFee: import("@prisma/client/runtime/library").Decimal | null;
-        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        constructionStartDate: Date | null;
+        deliveryDate: Date | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
         garageSpots: number;
+        registrationNumber: string | null;
+        garageArea: number | null;
         privateArea: number;
         totalArea: number | null;
-        garageArea: number | null;
-        constructionStartDate: Date | null;
-        deliveryDate: Date | null;
+        price: import("@prisma/client/runtime/library").Decimal;
+        condoFee: import("@prisma/client/runtime/library").Decimal | null;
+        iptuPrice: import("@prisma/client/runtime/library").Decimal | null;
+        description: string | null;
         brokerNotes: string | null;
         status: import(".prisma/client").$Enums.PropertyStatus;
-        isExclusive: boolean;
-        showOnSite: boolean;
-        createdAt: Date;
-        updatedAt: Date;
         id: number;
         addressId: number | null;
     }>;

@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreatePropertyDto, PropertyCategory, TransactionType } from './dto/create-property.dto';
-import { UpdatePropertyDto } from './dto/update-property.dto';
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,7 +16,8 @@ export class PropertiesService {
   async create(createPropertyDto: CreatePropertyDto) {
     const {
       address,
-      features,
+      propertyFeatures,      // Privativas
+      developmentFeatures,   // Comuns
       images,
       paymentConditions,
       constructionStartDate,
@@ -29,12 +28,11 @@ export class PropertiesService {
     return await this.prisma.property.create({
       data: {
         ...propertyData,
-        // Garante conversão de números
+        // Conversão de segurança
         garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
         price: Number(propertyData.price),
         privateArea: Number(propertyData.privateArea),
         
-        // Conversão de datas
         constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
         deliveryDate : deliveryDate ? new Date(deliveryDate) : undefined,
 
@@ -42,10 +40,19 @@ export class PropertiesService {
           create: { ...address }
         } : undefined,
 
-        features: (features && features.length > 0) ? {
-          connectOrCreate: features.map((featureName) => ({
-            where: { name: featureName },
-            create: { name: featureName },
+        // 1. Features Privativas
+        propertyFeatures: (propertyFeatures && propertyFeatures.length > 0) ? {
+          connectOrCreate: propertyFeatures.map((name) => ({
+            where: { name: name },
+            create: { name: name },
+          })),
+        } : undefined,
+
+        // 2. Features do Empreendimento
+        developmentFeatures: (developmentFeatures && developmentFeatures.length > 0) ? {
+          connectOrCreate: developmentFeatures.map((name) => ({
+            where: { name: name },
+            create: { name: name },
           })),
         } : undefined,
 
@@ -69,7 +76,8 @@ export class PropertiesService {
       },
       include: {
         address: true,
-        features: true,
+        propertyFeatures: true,
+        developmentFeatures: true,
         images: true,
         paymentConditions: true,
       }
@@ -96,6 +104,7 @@ export class PropertiesService {
         // Traz todas as imagens (Front filtra a capa na tabela e mostra o resto no modal)
         images: {
           select: { url: true, isCover: true }
+         
         }
       },
     });
@@ -110,7 +119,8 @@ export class PropertiesService {
       include: {
         address: true,
         images: true,
-        features: true,
+        propertyFeatures: true,    // Traz a lista separada
+        developmentFeatures: true, // Traz a lista separada
         paymentConditions: true
       }
     });
@@ -120,20 +130,19 @@ export class PropertiesService {
   }
 
   // ===========================================================================
-  // UPDATE (CORRIGIDO)
+  // UPDATE
   // ===========================================================================
-  async update(id: number, updatePropertyDto: any) { // Usando any no DTO para facilitar a limpeza
+  async update(id: number, updatePropertyDto: any) {
     await this.findOne(id);
 
-    // 1. LIMPEZA DE DADOS (CRUCIAL)
-    // Removemos id, createdAt, updatedAt, addressId pois não podem ser atualizados diretamente no 'data'
     const {
-      id: _id,            // Remove ID
-      createdAt: _created, // Remove datas automáticas
+      id: _id,
+      createdAt: _created,
       updatedAt: _updated,
-      addressId: _addrId,  // Remove FK solta
+      addressId: _addrId,
       address,
-      features,
+      propertyFeatures,      // Novo array
+      developmentFeatures,   // Novo array
       images,
       paymentConditions,
       constructionStartDate,
@@ -145,8 +154,6 @@ export class PropertiesService {
       where: { id: Number(id) },
       data: {
         ...propertyData,
-        
-        // Conversões de segurança (String -> Number) igual no create
         price: propertyData.price ? Number(propertyData.price) : undefined,
         condoFee: propertyData.condoFee ? Number(propertyData.condoFee) : undefined,
         iptuPrice: propertyData.iptuPrice ? Number(propertyData.iptuPrice) : undefined,
@@ -158,34 +165,34 @@ export class PropertiesService {
         totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
         garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
 
-        // Conversão de Datas
         constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
         deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
 
-        // Atualiza Endereço
         address: address ? {
           upsert: {
-            create: { 
-                street: address.street, number: address.number, neighborhood: address.neighborhood, 
-                city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement 
-            },
-            update: { 
-                street: address.street, number: address.number, neighborhood: address.neighborhood, 
-                city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement 
-            },
+            create: { ...address },
+            update: { ...address },
           },
         } : undefined,
 
-        // Atualiza Features (Limpa e reconecta)
-        features: features ? {
-          set: [], 
-          connectOrCreate: features.map((f: string) => ({
+        // Atualiza Property Features (Privativas)
+        propertyFeatures: propertyFeatures ? {
+          set: [], // Limpa relações antigas
+          connectOrCreate: propertyFeatures.map((f: string) => ({
             where: { name: f },
             create: { name: f },
           })),
         } : undefined,
 
-        // Atualiza Condições de Pagamento
+        // Atualiza Development Features (Comuns)
+        developmentFeatures: developmentFeatures ? {
+          set: [], // Limpa relações antigas
+          connectOrCreate: developmentFeatures.map((f: string) => ({
+            where: { name: f },
+            create: { name: f },
+          })),
+        } : undefined,
+
         paymentConditions: paymentConditions ? {
           deleteMany: {},
           createMany: {
@@ -196,23 +203,21 @@ export class PropertiesService {
           }
         } : undefined,
         
-        // Atualiza Imagens
-        // Nota: O ideal seria deletar as antigas antes de criar novas se a intenção for substituir a galeria.
-        // Aqui estamos apenas ADICIONANDO NOVAS se houver.
-        // Se quiser substituir tudo: adicione 'deleteMany: {}' antes do createMany.
-        images: (images && images.length > 0) ? {
+        images: images ? {
+          deleteMany: {}, // Substituição total da galeria
           createMany: {
             data: images.map((img: any) => ({
               url: img.url,
               isCover: img.isCover || false,
             })),
-            skipDuplicates: true // Evita erro se reenviar a mesma URL
+            skipDuplicates: true
           },
         } : undefined,
       },
       include: {
         address: true,
-        features: true,
+        propertyFeatures: true,
+        developmentFeatures: true,
         images: true,
         paymentConditions: true,
       },
@@ -230,7 +235,7 @@ export class PropertiesService {
   }
 
   // ===========================================================================
-  // IMPORTAR DO DWV (NATIVO E ROBUSTO)
+  // IMPORTAR DO DWV
   // ===========================================================================
   async importFromDwv(dwvUrl: string) {
     console.log(`--- IMPORTAÇÃO DWV: ${dwvUrl} ---`);
@@ -238,7 +243,7 @@ export class PropertiesService {
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-    // 1. FETCH NATIVO (Sem Axios para evitar bugs de compressão)
+    // 1. FETCH NATIVO
     let html = '';
     try {
       const response = await fetch(dwvUrl, {
@@ -286,7 +291,7 @@ export class PropertiesService {
     );
 
     console.log(`Imagens encontradas: ${uniqueUrls.length}`);
-    const urlsToProcess = uniqueUrls.slice(0, 20);
+    const urlsToProcess = uniqueUrls.slice(0, 20); // Limite de 20 fotos
     const processedImages: { url: string; isCover: boolean }[] = [];
 
     for (let i = 0; i < urlsToProcess.length; i++) {
@@ -298,9 +303,8 @@ export class PropertiesService {
         const arrayBuffer = await imgResp.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        if (buffer.length < 5000) continue;
+        if (buffer.length < 5000) continue; // Ignora ícones pequenos
 
-        // Nome simples e seguro
         const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
         const filePath = path.join(uploadDir, randomName);
 
@@ -315,8 +319,9 @@ export class PropertiesService {
       }
     }
 
-    console.log(`Total salvo: ${processedImages.length}`);
-
+    // 4. CRIAR DTO E SALVAR
+    // Nota: Como não sabemos distinguir o que é privativo ou comum na importação,
+    // salvamos uma tag genérica em developmentFeatures
     const createDto: CreatePropertyDto = {
       title: title,
       description: `Importado de: ${dwvUrl}`,
@@ -329,7 +334,8 @@ export class PropertiesService {
       privateArea,
       showOnSite: true,
       isExclusive: false,
-      features: ["Importado DWV"],
+      propertyFeatures: [],
+      developmentFeatures: ["Importado DWV"],
       images: processedImages,
       address: {
         street: "Importado (Verificar)", number: "S/N", neighborhood: "Centro", 

@@ -15,7 +15,11 @@ export declare class PropertiesController {
             complement: string | null;
             zipCode: string;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
@@ -89,7 +93,11 @@ export declare class PropertiesController {
             complement: string | null;
             zipCode: string;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
@@ -145,7 +153,11 @@ export declare class PropertiesController {
             complement: string | null;
             zipCode: string;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];
@@ -232,7 +244,11 @@ export declare class PropertiesController {
             complement: string | null;
             zipCode: string;
         } | null;
-        features: {
+        propertyFeatures: {
+            id: number;
+            name: string;
+        }[];
+        developmentFeatures: {
             id: number;
             name: string;
         }[];

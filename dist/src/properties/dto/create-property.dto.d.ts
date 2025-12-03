@@ -43,6 +43,8 @@ export declare class CreatePropertyDto {
     subtitle?: string;
     category: PropertyCategory;
     transactionType?: TransactionType;
+    isExclusive: boolean;
+    showOnSite: boolean;
     exclusivityDocUrl?: string;
     registrationNumber?: string;
     price: number;
@@ -61,10 +63,9 @@ export declare class CreatePropertyDto {
     brokerNotes?: string;
     status?: PropertyStatus;
     address?: CreateAddressDto;
-    features?: string[];
+    propertyFeatures?: string[];
+    developmentFeatures?: string[];
     images?: CreateImageDto[];
     paymentConditions?: CreatePaymentConditionDto[];
-    isExclusive: boolean;
-    showOnSite: boolean;
 }
 export {};

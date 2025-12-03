@@ -55,7 +55,7 @@ let PropertiesService = class PropertiesService {
         this.prisma = prisma;
     }
     async create(createPropertyDto) {
-        const { address, features, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = createPropertyDto;
+        const { address, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = createPropertyDto;
         return await this.prisma.property.create({
             data: {
                 ...propertyData,
@@ -67,10 +67,16 @@ let PropertiesService = class PropertiesService {
                 address: address ? {
                     create: { ...address }
                 } : undefined,
-                features: (features && features.length > 0) ? {
-                    connectOrCreate: features.map((featureName) => ({
-                        where: { name: featureName },
-                        create: { name: featureName },
+                propertyFeatures: (propertyFeatures && propertyFeatures.length > 0) ? {
+                    connectOrCreate: propertyFeatures.map((name) => ({
+                        where: { name: name },
+                        create: { name: name },
+                    })),
+                } : undefined,
+                developmentFeatures: (developmentFeatures && developmentFeatures.length > 0) ? {
+                    connectOrCreate: developmentFeatures.map((name) => ({
+                        where: { name: name },
+                        create: { name: name },
                     })),
                 } : undefined,
                 images: (images && images.length > 0) ? {
@@ -92,7 +98,8 @@ let PropertiesService = class PropertiesService {
             },
             include: {
                 address: true,
-                features: true,
+                propertyFeatures: true,
+                developmentFeatures: true,
                 images: true,
                 paymentConditions: true,
             }
@@ -124,7 +131,8 @@ let PropertiesService = class PropertiesService {
             include: {
                 address: true,
                 images: true,
-                features: true,
+                propertyFeatures: true,
+                developmentFeatures: true,
                 paymentConditions: true
             }
         });
@@ -134,7 +142,7 @@ let PropertiesService = class PropertiesService {
     }
     async update(id, updatePropertyDto) {
         await this.findOne(id);
-        const { id: _id, createdAt: _created, updatedAt: _updated, addressId: _addrId, address, features, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
+        const { id: _id, createdAt: _created, updatedAt: _updated, addressId: _addrId, address, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
         return this.prisma.property.update({
             where: { id: Number(id) },
             data: {
@@ -153,19 +161,20 @@ let PropertiesService = class PropertiesService {
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
                 address: address ? {
                     upsert: {
-                        create: {
-                            street: address.street, number: address.number, neighborhood: address.neighborhood,
-                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
-                        },
-                        update: {
-                            street: address.street, number: address.number, neighborhood: address.neighborhood,
-                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
-                        },
+                        create: { ...address },
+                        update: { ...address },
                     },
                 } : undefined,
-                features: features ? {
+                propertyFeatures: propertyFeatures ? {
                     set: [],
-                    connectOrCreate: features.map((f) => ({
+                    connectOrCreate: propertyFeatures.map((f) => ({
+                        where: { name: f },
+                        create: { name: f },
+                    })),
+                } : undefined,
+                developmentFeatures: developmentFeatures ? {
+                    set: [],
+                    connectOrCreate: developmentFeatures.map((f) => ({
                         where: { name: f },
                         create: { name: f },
                     })),
@@ -179,7 +188,8 @@ let PropertiesService = class PropertiesService {
                         }))
                     }
                 } : undefined,
-                images: (images && images.length > 0) ? {
+                images: images ? {
+                    deleteMany: {},
                     createMany: {
                         data: images.map((img) => ({
                             url: img.url,
@@ -191,7 +201,8 @@ let PropertiesService = class PropertiesService {
             },
             include: {
                 address: true,
-                features: true,
+                propertyFeatures: true,
+                developmentFeatures: true,
                 images: true,
                 paymentConditions: true,
             },
@@ -274,7 +285,6 @@ let PropertiesService = class PropertiesService {
                 console.log(`Erro ao baixar imagem: Ignorando.`);
             }
         }
-        console.log(`Total salvo: ${processedImages.length}`);
         const createDto = {
             title: title,
             description: `Importado de: ${dwvUrl}`,
@@ -287,7 +297,8 @@ let PropertiesService = class PropertiesService {
             privateArea,
             showOnSite: true,
             isExclusive: false,
-            features: ["Importado DWV"],
+            propertyFeatures: [],
+            developmentFeatures: ["Importado DWV"],
             images: processedImages,
             address: {
                 street: "Importado (Verificar)", number: "S/N", neighborhood: "Centro",

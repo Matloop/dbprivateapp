@@ -9,12 +9,11 @@ import {
   IsNumber, 
   IsOptional, 
   IsString, 
-  IsUrl, 
   Min, 
   ValidateNested 
 } from 'class-validator';
 
-// 1. Enums (Precisam bater com o schema.prisma)
+// ENUMS (Precisam estar sincronizados com o Prisma)
 export enum PropertyCategory {
   APARTAMENTO = 'APARTAMENTO',
   CASA = 'CASA',
@@ -41,193 +40,96 @@ export enum PropertyStatus {
   ALUGADO = 'ALUGADO',
 }
 
-// 2. Sub-DTOs (Objetos aninhados)
+// SUB-DTOS
 
 class CreateAddressDto {
-  @IsString()
-  @IsNotEmpty()
-  street: string;
-
-  @IsString()
-  @IsNotEmpty()
-  number: string;
-
-  @IsString()
-  @IsOptional()
-  complement?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  neighborhood: string;
-  
-  
-  @IsString()
-  @IsNotEmpty()
-  city: string;
-
-  @IsString()
-  @IsNotEmpty()
-  state: string; // Ex: "SC"
-
-  @IsString()
-  @IsNotEmpty()
-  zipCode: string;
+  @IsString() @IsNotEmpty() street: string;
+  @IsString() @IsNotEmpty() number: string;
+  @IsString() @IsOptional() complement?: string;
+  @IsString() @IsNotEmpty() neighborhood: string;
+  @IsString() @IsNotEmpty() city: string;
+  @IsString() @IsNotEmpty() state: string;
+  @IsString() @IsNotEmpty() zipCode: string;
 }
 
 class CreateImageDto {
-  @IsString()
-  @IsNotEmpty()
-  // @IsUrl() // Opcional: descomente se quiser validar formato de URL estrito
-  url: string;
-  @IsBoolean()
-  @IsOptional()
-  isCover?: boolean;
+  @IsString() @IsNotEmpty() url: string;
+  @IsBoolean() @IsOptional() isCover?: boolean;
 }
 
 class CreatePaymentConditionDto {
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-
-  @IsNumber()
-  @IsOptional()
-  value?: number;
+  @IsString() @IsNotEmpty() description: string;
+  @IsNumber() @IsOptional() value?: number;
 }
 
-// 3. DTO Principal
+// DTO PRINCIPAL
 
 export class CreatePropertyDto {
-  // --- Informações Básicas ---
-  @IsString()
-  @IsNotEmpty()
-  title: string;
+  @IsString() @IsNotEmpty() title: string;
+  @IsString() @IsOptional() subtitle?: string;
+  
+  @IsEnum(PropertyCategory) @IsNotEmpty() category: PropertyCategory;
+  @IsEnum(TransactionType) @IsOptional() transactionType?: TransactionType;
+  
+  @IsBoolean() isExclusive: boolean;
+  @IsBoolean() showOnSite: boolean;
+  
+  @IsString() @IsOptional() exclusivityDocUrl?: string;
+  @IsString() @IsOptional() registrationNumber?: string;
 
-  @IsString()
-  @IsOptional()
-  subtitle?: string;
+  // Valores
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) price: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @IsOptional() @Min(0) condoFee?: number;
+  @IsNumber({ maxDecimalPlaces: 2 }) @IsOptional() @Min(0) iptuPrice?: number;
 
-  @IsEnum(PropertyCategory)
-  @IsNotEmpty()
-  category: PropertyCategory;
+  // Numéricos
+  @IsInt() @IsOptional() @Min(0) bedrooms?: number;
+  @IsInt() @IsOptional() @Min(0) suites?: number;
+  @IsInt() @IsOptional() @Min(0) bathrooms?: number;
+  @IsInt() @IsOptional() @Min(0) garageSpots?: number;
 
-  @IsEnum(TransactionType)
-  @IsOptional()
-  transactionType?: TransactionType;
+  // Áreas
+  @IsNumber() privateArea: number;
+  @IsNumber() @IsOptional() totalArea?: number;
+  @IsNumber() @IsOptional() garageArea?: number;
 
-  @IsString()
-  @IsOptional()
-  exclusivityDocUrl?: string;
+  // Datas
+  @IsDate() @IsOptional() @Type(() => Date) constructionStartDate?: Date;
+  @IsDate() @IsOptional() @Type(() => Date) deliveryDate?: Date;
 
-  @IsString()
-  @IsOptional()
-  registrationNumber?: string; // Nº Matrícula
+  // Textos
+  @IsString() @IsOptional() description?: string;
+  @IsString() @IsOptional() brokerNotes?: string;
+  @IsEnum(PropertyStatus) @IsOptional() status?: PropertyStatus;
 
-  // --- Valores (Financeiro) ---
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  price: number;
+  // --- RELACIONAMENTOS ---
 
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @IsOptional()
-  @Min(0)
-  condoFee?: number;
-
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @IsOptional()
-  @Min(0)
-  iptuPrice?: number;
-
-  // --- Características Numéricas ---
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  bedrooms?: number;
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  suites?: number;
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  bathrooms?: number;
-
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  garageSpots?: number;
-
-  // --- Áreas ---
-  @IsNumber()
-  @IsNotEmpty() // Área privativa costuma ser obrigatória
-  privateArea: number;
-
-  @IsNumber()
-  @IsOptional()
-  totalArea?: number;
-
-  @IsNumber()
-  @IsOptional()
-  garageArea?: number;
-
-  // --- Datas ---
-  // O @Type converte a string ISO ("2023-12-01") para objeto Date automaticamente
-  @IsDate()
-  @IsOptional()
-  @Type(() => Date)
-  constructionStartDate?: Date;
-
-  @IsDate()
-  @IsOptional()
-  @Type(() => Date)
-  deliveryDate?: Date;
-
-  // --- Textos Longos ---
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsString()
-  @IsOptional()
-  brokerNotes?: string;
-
-  @IsEnum(PropertyStatus)
-  @IsOptional()
-  status?: PropertyStatus;
-
-  // ==========================
-  // --- OBJETOS ANINHADOS ---
-  // ==========================
-
-  // 1. Endereço (Objeto Único)
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateAddressDto)
   address?: CreateAddressDto;
 
-  // 2. Features (Array de Strings)
-  // O front manda: ["Piscina", "Academia", "Elevador"]
+  // Características do Imóvel (Privativas)
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  features?: string[];
+  propertyFeatures?: string[];
 
-  // 3. Imagens (Array de Objetos)
+  // Características do Empreendimento (Comuns)
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  developmentFeatures?: string[];
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateImageDto)
   @IsOptional()
   images?: CreateImageDto[];
 
-  // 4. Condições de Pagamento (Array de Objetos)
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreatePaymentConditionDto)
   @IsOptional()
   paymentConditions?: CreatePaymentConditionDto[];
-  @IsBoolean()
-  isExclusive : boolean
-  @IsBoolean()
-  showOnSite  : boolean
 }

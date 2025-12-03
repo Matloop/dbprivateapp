@@ -125,6 +125,8 @@ class CreatePropertyDto {
     subtitle;
     category;
     transactionType;
+    isExclusive;
+    showOnSite;
     exclusivityDocUrl;
     registrationNumber;
     price;
@@ -143,13 +145,12 @@ class CreatePropertyDto {
     brokerNotes;
     status;
     address;
-    features;
+    propertyFeatures;
+    developmentFeatures;
     images;
     paymentConditions;
-    isExclusive;
-    showOnSite;
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String }, subtitle: { required: false, type: () => String }, category: { required: true, enum: require("./create-property.dto").PropertyCategory }, transactionType: { required: false, enum: require("./create-property.dto").TransactionType }, exclusivityDocUrl: { required: false, type: () => String }, registrationNumber: { required: false, type: () => String }, price: { required: true, type: () => Number, minimum: 0 }, condoFee: { required: false, type: () => Number, minimum: 0 }, iptuPrice: { required: false, type: () => Number, minimum: 0 }, bedrooms: { required: false, type: () => Number, minimum: 0 }, suites: { required: false, type: () => Number, minimum: 0 }, bathrooms: { required: false, type: () => Number, minimum: 0 }, garageSpots: { required: false, type: () => Number, minimum: 0 }, privateArea: { required: true, type: () => Number }, totalArea: { required: false, type: () => Number }, garageArea: { required: false, type: () => Number }, constructionStartDate: { required: false, type: () => Date }, deliveryDate: { required: false, type: () => Date }, description: { required: false, type: () => String }, brokerNotes: { required: false, type: () => String }, status: { required: false, enum: require("./create-property.dto").PropertyStatus }, address: { required: false, type: () => CreateAddressDto }, features: { required: false, type: () => [String] }, images: { required: false, type: () => [CreateImageDto] }, paymentConditions: { required: false, type: () => [CreatePaymentConditionDto] }, isExclusive: { required: true, type: () => Boolean }, showOnSite: { required: true, type: () => Boolean } };
+        return { title: { required: true, type: () => String }, subtitle: { required: false, type: () => String }, category: { required: true, enum: require("./create-property.dto").PropertyCategory }, transactionType: { required: false, enum: require("./create-property.dto").TransactionType }, isExclusive: { required: true, type: () => Boolean }, showOnSite: { required: true, type: () => Boolean }, exclusivityDocUrl: { required: false, type: () => String }, registrationNumber: { required: false, type: () => String }, price: { required: true, type: () => Number, minimum: 0 }, condoFee: { required: false, type: () => Number, minimum: 0 }, iptuPrice: { required: false, type: () => Number, minimum: 0 }, bedrooms: { required: false, type: () => Number, minimum: 0 }, suites: { required: false, type: () => Number, minimum: 0 }, bathrooms: { required: false, type: () => Number, minimum: 0 }, garageSpots: { required: false, type: () => Number, minimum: 0 }, privateArea: { required: true, type: () => Number }, totalArea: { required: false, type: () => Number }, garageArea: { required: false, type: () => Number }, constructionStartDate: { required: false, type: () => Date }, deliveryDate: { required: false, type: () => Date }, description: { required: false, type: () => String }, brokerNotes: { required: false, type: () => String }, status: { required: false, enum: require("./create-property.dto").PropertyStatus }, address: { required: false, type: () => CreateAddressDto }, propertyFeatures: { required: false, type: () => [String] }, developmentFeatures: { required: false, type: () => [String] }, images: { required: false, type: () => [CreateImageDto] }, paymentConditions: { required: false, type: () => [CreatePaymentConditionDto] } };
     }
 }
 exports.CreatePropertyDto = CreatePropertyDto;
@@ -173,6 +174,14 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "transactionType", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreatePropertyDto.prototype, "isExclusive", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreatePropertyDto.prototype, "showOnSite", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
@@ -226,7 +235,6 @@ __decorate([
 ], CreatePropertyDto.prototype, "garageSpots", void 0);
 __decorate([
     (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Number)
 ], CreatePropertyDto.prototype, "privateArea", void 0);
 __decorate([
@@ -277,7 +285,13 @@ __decorate([
     (0, class_validator_1.IsString)({ each: true }),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
-], CreatePropertyDto.prototype, "features", void 0);
+], CreatePropertyDto.prototype, "propertyFeatures", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreatePropertyDto.prototype, "developmentFeatures", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.ValidateNested)({ each: true }),
@@ -292,12 +306,4 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreatePropertyDto.prototype, "paymentConditions", void 0);
-__decorate([
-    (0, class_validator_1.IsBoolean)(),
-    __metadata("design:type", Boolean)
-], CreatePropertyDto.prototype, "isExclusive", void 0);
-__decorate([
-    (0, class_validator_1.IsBoolean)(),
-    __metadata("design:type", Boolean)
-], CreatePropertyDto.prototype, "showOnSite", void 0);
 //# sourceMappingURL=create-property.dto.js.map

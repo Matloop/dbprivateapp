@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  
 }
 
 datasource db {
@@ -9,7 +8,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 1. Enumerações (Mantemos iguais, pois organizam os dados)
+// --- ENUMS ---
 enum PropertyCategory {
   APARTAMENTO
   CASA
@@ -22,7 +21,6 @@ enum PropertyCategory {
   DIFERENCIADO
   EMBARCACAO
   TERRENO
-  
 }
 
 enum TransactionType {
@@ -37,9 +35,8 @@ enum PropertyStatus {
   ALUGADO
 }
 
-// 2. Modelo Principal
+// --- MODELO PRINCIPAL ---
 model Property {
-  // MUDANÇA AQUI: Int + autoincrement
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -47,55 +44,58 @@ model Property {
   showOnSite   Boolean 
   isExclusive  Boolean
 
-  // --- Informações Básicas ---
-  title             String  // "Nome do exclusivo"
-  subtitle          String? // "Subtítulo"
+  // Infos Básicas
+  title             String
+  subtitle          String?
   category          PropertyCategory
   transactionType   TransactionType @default(VENDA)
-  exclusivityDocUrl String? // Link do PDF de autorização
+  exclusivityDocUrl String?
 
-  // --- Localização (Relacionamento 1:1) ---
+  // Localização
   address   Address? @relation(fields: [addressId], references: [id])
-  addressId Int?     @unique // Agora é Int para bater com o ID do Address
+  addressId Int?     @unique
 
-  // --- Datas ---
+  // Datas
   constructionStartDate DateTime?
   deliveryDate          DateTime?
 
-  // --- Características Numéricas ---
+  // Numéricos
   bedrooms    Int     @default(0)
   suites      Int     @default(0)
   bathrooms   Int     @default(0)
   garageSpots Int     @default(0)
   
-  registrationNumber String? // Matrícula (String pois pode ter letras ou zeros a esquerda)
+  registrationNumber String?
   
   // Áreas
   garageArea  Float?
   privateArea Float
   totalArea   Float?
 
-  // --- Valores (Decimal é obrigatório para dinheiro) ---
+  // Valores
   price     Decimal  @db.Decimal(15, 2)
   condoFee  Decimal? @db.Decimal(10, 2)
   iptuPrice Decimal? @db.Decimal(10, 2)
 
-  // --- Descrição e Extras ---
+  // Textos
   description String?   @db.Text
-  features    Feature[] // Relacionamento N:N
-
-  // --- Galeria ---
-  images PropertyImage[]
-
-  // --- Condições de Pagamento ---
-  paymentConditions PaymentCondition[]
-
-  // --- Controle Interno ---
-  brokerNotes String?        @db.Text
+  brokerNotes String?   @db.Text
   status      PropertyStatus @default(DISPONIVEL)
+
+  // --- NOVOS RELACIONAMENTOS DE CARACTERÍSTICAS ---
+  
+  // Características da Unidade (ex: Mobiliado, Churrasqueira a carvão)
+  propertyFeatures PropertyFeature[] 
+  
+  // Características do Empreendimento (ex: Piscina, Academia, Cinema)
+  developmentFeatures DevelopmentFeature[]
+
+  // Outros Relacionamentos
+  images PropertyImage[]
+  paymentConditions PaymentCondition[]
 }
 
-// 3. Endereço
+// --- ENDEREÇO ---
 model Address {
   id           Int     @id @default(autoincrement())
   state        String
@@ -109,25 +109,33 @@ model Address {
   property Property?
 }
 
-// 4. Imagens
+// --- IMAGENS ---
 model PropertyImage {
   id      Int     @id @default(autoincrement())
   url     String
   isCover Boolean @default(false)
 
-  propertyId Int // FK agora é Int
+  propertyId Int 
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
-// 5. Características (Checkbox: Academia, Piscina...)
-model Feature {
-  id   Int    @id @default(autoincrement())
-  name String @unique // Garante que não tenha duas "Piscina" cadastradas
+// --- NOVAS TABELAS DE CARACTERÍSTICAS ---
 
+// 1. Privativas (Do Imóvel)
+model PropertyFeature {
+  id   Int    @id @default(autoincrement())
+  name String @unique 
   properties Property[]
 }
 
-// 6. Condições de Pagamento
+// 2. Comuns (Do Empreendimento)
+model DevelopmentFeature {
+  id   Int    @id @default(autoincrement())
+  name String @unique 
+  properties Property[]
+}
+
+// --- CONDIÇÕES DE PAGAMENTO ---
 model PaymentCondition {
   id          Int      @id @default(autoincrement())
   description String
@@ -137,6 +145,7 @@ model PaymentCondition {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
+// --- USUÁRIO (Auth) ---
 model User {
   id        String @id @db.Uuid
   email     String @unique
