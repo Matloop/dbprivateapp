@@ -45,9 +45,13 @@ let PropertiesController = class PropertiesController {
     remove(id) {
         return this.propertiesService.remove(+id);
     }
+    async importDwv(body) {
+        return this.propertiesService.importFromDwv(body.url);
+    }
 };
 exports.PropertiesController = PropertiesController;
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Post)(),
     (0, swagger_1.ApiOperation)({ summary: 'Cria um novo imóvel' }),
     openapi.ApiResponse({ status: 201, type: Object }),
@@ -57,7 +61,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "create", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)(),
     openapi.ApiResponse({ status: 200 }),
     __metadata("design:type", Function),
@@ -89,8 +92,15 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)('import-dwv'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], PropertiesController.prototype, "importDwv", null);
 exports.PropertiesController = PropertiesController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, swagger_1.ApiTags)('Imóveis'),
     (0, common_1.Controller)('properties'),
     __metadata("design:paramtypes", [properties_service_1.PropertiesService])

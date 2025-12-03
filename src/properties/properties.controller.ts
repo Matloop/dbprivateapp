@@ -4,19 +4,18 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
-@UseGuards(JwtAuthGuard)
 @ApiTags('Imóveis')
 @Controller('properties')
 export class PropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   @ApiOperation({summary:'Cria um novo imóvel'})
   create(@Body() createPropertyDto: CreatePropertyDto) {
     return this.propertiesService.create(createPropertyDto);
   }
   
-  @UseGuards(JwtAuthGuard)
   @Get()
   async findAll() {
     console.time('AUTH_ATE_CONTROLLER'); 
@@ -43,5 +42,10 @@ export class PropertiesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.propertiesService.remove(+id);
+  }
+
+  @Post('import-dwv')
+  async importDwv(@Body() body: { url: string }) {
+    return this.propertiesService.importFromDwv(body.url);
   }
 }

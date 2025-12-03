@@ -1,10 +1,43 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
@@ -12,6 +45,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PropertiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const create_property_dto_1 = require("./dto/create-property.dto");
+const cheerio = __importStar(require("cheerio"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 let PropertiesService = class PropertiesService {
     prisma;
     constructor(prisma) {
@@ -22,26 +59,21 @@ let PropertiesService = class PropertiesService {
         return await this.prisma.property.create({
             data: {
                 ...propertyData,
+                garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
+                price: Number(propertyData.price),
+                privateArea: Number(propertyData.privateArea),
                 constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
                 address: address ? {
-                    create: {
-                        street: address.street,
-                        number: address.number,
-                        complement: address.complement,
-                        neighborhood: address.neighborhood,
-                        city: address.city,
-                        state: address.state,
-                        zipCode: address.zipCode
-                    }
+                    create: { ...address }
                 } : undefined,
-                features: features && features?.length > 0 ? {
+                features: (features && features.length > 0) ? {
                     connectOrCreate: features.map((featureName) => ({
                         where: { name: featureName },
                         create: { name: featureName },
                     })),
                 } : undefined,
-                images: images && images?.length > 0 ? {
+                images: (images && images.length > 0) ? {
                     createMany: {
                         data: images.map((img) => ({
                             url: img.url,
@@ -49,7 +81,7 @@ let PropertiesService = class PropertiesService {
                         })),
                     },
                 } : undefined,
-                paymentConditions: paymentConditions && paymentConditions?.length > 0 ? {
+                paymentConditions: (paymentConditions && paymentConditions.length > 0) ? {
                     createMany: {
                         data: paymentConditions.map((cond) => ({
                             description: cond.description,
@@ -81,15 +113,13 @@ let PropertiesService = class PropertiesService {
                     select: { city: true, state: true, neighborhood: true }
                 },
                 images: {
-                    where: { isCover: true },
-                    take: 1,
                     select: { url: true, isCover: true }
                 }
             },
         });
     }
     async findOne(id) {
-        return this.prisma.property.findUnique({
+        const property = await this.prisma.property.findUnique({
             where: { id },
             include: {
                 address: true,
@@ -98,18 +128,39 @@ let PropertiesService = class PropertiesService {
                 paymentConditions: true
             }
         });
+        if (!property)
+            throw new common_1.NotFoundException(`Imóvel ${id} não encontrado`);
+        return property;
     }
     async update(id, updatePropertyDto) {
         await this.findOne(id);
-        const { address, features, images, paymentConditions, ...propertyData } = updatePropertyDto;
+        const { id: _id, createdAt: _created, updatedAt: _updated, addressId: _addrId, address, features, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
         return this.prisma.property.update({
-            where: { id: id, },
+            where: { id: Number(id) },
             data: {
                 ...propertyData,
+                price: propertyData.price ? Number(propertyData.price) : undefined,
+                condoFee: propertyData.condoFee ? Number(propertyData.condoFee) : undefined,
+                iptuPrice: propertyData.iptuPrice ? Number(propertyData.iptuPrice) : undefined,
+                bedrooms: propertyData.bedrooms ? Number(propertyData.bedrooms) : undefined,
+                suites: propertyData.suites ? Number(propertyData.suites) : undefined,
+                bathrooms: propertyData.bathrooms ? Number(propertyData.bathrooms) : undefined,
+                garageSpots: propertyData.garageSpots ? Number(propertyData.garageSpots) : undefined,
+                privateArea: propertyData.privateArea ? Number(propertyData.privateArea) : undefined,
+                totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
+                garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
+                constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
+                deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
                 address: address ? {
                     upsert: {
-                        create: { ...address },
-                        update: { ...address },
+                        create: {
+                            street: address.street, number: address.number, neighborhood: address.neighborhood,
+                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
+                        },
+                        update: {
+                            street: address.street, number: address.number, neighborhood: address.neighborhood,
+                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
+                        },
                     },
                 } : undefined,
                 features: features ? {
@@ -122,18 +173,19 @@ let PropertiesService = class PropertiesService {
                 paymentConditions: paymentConditions ? {
                     deleteMany: {},
                     createMany: {
-                        data: paymentConditions.map(p => ({
+                        data: paymentConditions.map((p) => ({
                             description: p.description,
                             value: p.value
                         }))
                     }
                 } : undefined,
-                images: images && images?.length > 0 ? {
+                images: (images && images.length > 0) ? {
                     createMany: {
                         data: images.map((img) => ({
                             url: img.url,
                             isCover: img.isCover || false,
                         })),
+                        skipDuplicates: true
                     },
                 } : undefined,
             },
@@ -150,6 +202,99 @@ let PropertiesService = class PropertiesService {
         return this.prisma.property.delete({
             where: { id }
         });
+    }
+    async importFromDwv(dwvUrl) {
+        console.log(`--- IMPORTAÇÃO DWV: ${dwvUrl} ---`);
+        const uploadDir = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadDir))
+            fs.mkdirSync(uploadDir, { recursive: true });
+        let html = '';
+        try {
+            const response = await fetch(dwvUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+            html = await response.text();
+        }
+        catch (e) {
+            throw new Error("Erro ao baixar site.");
+        }
+        const $ = cheerio.load(html);
+        const building = $('h2').first().text().trim();
+        const unit = $('p').first().text().trim();
+        const title = building ? `${building} ${unit}` : ($('title').text() || "Imóvel DWV");
+        let price = 0;
+        $('h1, h2').each((_, el) => {
+            const txt = $(el).text();
+            if (txt.includes('R$') && price === 0) {
+                price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
+            }
+        });
+        let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0;
+        $('div').each((_, el) => {
+            const label = $(el).find('p').text().toLowerCase();
+            const value = parseFloat($(el).find('h2').text().replace(',', '.'));
+            if (!isNaN(value)) {
+                if (label.includes('dorm'))
+                    bedrooms = value;
+                if (label.includes('suítes'))
+                    suites = value;
+                if (label.includes('vagas'))
+                    garageSpots = value;
+                if (label.includes('privati'))
+                    privateArea = value;
+            }
+        });
+        const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
+        const matches = html.match(regex) || [];
+        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25);
+        console.log(`Imagens encontradas: ${uniqueUrls.length}`);
+        const urlsToProcess = uniqueUrls.slice(0, 20);
+        const processedImages = [];
+        for (let i = 0; i < urlsToProcess.length; i++) {
+            try {
+                const url = urlsToProcess[i];
+                const imgResp = await fetch(url);
+                if (!imgResp.ok)
+                    continue;
+                const arrayBuffer = await imgResp.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                if (buffer.length < 5000)
+                    continue;
+                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
+                const filePath = path.join(uploadDir, randomName);
+                fs.writeFileSync(filePath, buffer);
+                processedImages.push({
+                    url: `http://127.0.0.1:3000/uploads/${randomName}`,
+                    isCover: processedImages.length === 0
+                });
+            }
+            catch (err) {
+                console.log(`Erro ao baixar imagem: Ignorando.`);
+            }
+        }
+        console.log(`Total salvo: ${processedImages.length}`);
+        const createDto = {
+            title: title,
+            description: `Importado de: ${dwvUrl}`,
+            category: create_property_dto_1.PropertyCategory.APARTAMENTO,
+            transactionType: create_property_dto_1.TransactionType.VENDA,
+            price: price,
+            bedrooms,
+            suites,
+            garageSpots,
+            privateArea,
+            showOnSite: true,
+            isExclusive: false,
+            features: ["Importado DWV"],
+            images: processedImages,
+            address: {
+                street: "Importado (Verificar)", number: "S/N", neighborhood: "Centro",
+                city: "Balneário Camboriú", state: "SC", zipCode: "88330-000"
+            }
+        };
+        return this.create(createDto);
     }
 };
 exports.PropertiesService = PropertiesService;
