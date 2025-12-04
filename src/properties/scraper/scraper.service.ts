@@ -8,68 +8,85 @@ export class ScraperService {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   async scrapeLegacySystem() {
-    console.log("🚀 Iniciando Robô V10 (Correção IPTU, Condomínio e Ambientes)...");
+    console.log("🚀 Iniciando Robô V13 (FULL: Imagens HD + Correção de Valores + Linux Fix)...");
 
     const browser = await puppeteer.launch({ 
-      headless: false, // Mantivemos false para você ver rodando
+      headless: false, // Mantenha false para ver o processo (depois mude para true ou 'new')
       defaultViewport: null,
       userDataDir: './puppeteer_data', 
-      // --- CORREÇÃO AQUI ---
+      // Argumentos otimizados para Linux/Wayland e estabilidade
       args: [
         '--start-maximized',
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        // Argumentos críticos para rodar visualmente no Linux:
-        '--disable-gpu',             // Desabilita aceleração de hardware (evita erros de renderização)
-        '--disable-dev-shm-usage',   // Evita erro de memória compartilhada
-        '--ozone-platform=x11'       // FORÇA o uso do X11 ao invés do Wayland (Resolve o seu erro)
-      ],
-      // Se necessário, descomente a linha abaixo para apontar o Chrome do sistema se o do puppeteer falhar
-      // executablePath: '/usr/bin/google-chrome' 
+        '--disable-gpu',             
+        '--disable-dev-shm-usage',   
+        '--ozone-platform=x11' // Força X11 para evitar erro do Wayland
+      ]
     });
     
     const page = await browser.newPage();
 
-    // Tenta acessar a intranet
-    try { await page.goto('https://www.dbprivate.com.br/intranet/index/', { waitUntil: 'domcontentloaded' }); } catch (e) { console.log('Erro ao abrir página inicial'); }
+    // 1. Acessa o Sistema
+    try { 
+        await page.goto('https://www.dbprivate.com.br/intranet/index/', { waitUntil: 'domcontentloaded' }); 
+    } catch (e) { 
+        console.log('Erro ao abrir página inicial.'); 
+    }
 
     console.log("⏳ Aguardando lista de imóveis...");
-    try { await page.waitForSelector('tr[data-rowid]', { timeout: 60000 }); } catch (e) { 
+    try { 
+        await page.waitForSelector('tr[data-rowid]', { timeout: 60000 }); 
+    } catch (e) { 
         console.error("❌ Timeout: Lista não carregou.");
         await browser.close(); 
         return; 
     }
 
-    // Pega os IDs da primeira página (para teste)
+    // Pega os IDs (Limitado a 10 para teste inicial, remova o .slice para rodar tudo)
     const propertyIds = await page.evaluate(() => {
         return Array.from(document.querySelectorAll('tr[data-rowid]'))
             .map(row => row.getAttribute('data-rowid'))
             .filter(id => id)
-            .slice(0, 5); // LIMITADO A 5 PARA TESTE RÁPIDO
+            // .slice(0, 10) // <--- REMOVA OU AUMENTE ESSE LIMITE QUANDO QUISER RODAR TUDO
     });
 
-    console.log(`📋 Processando amostra de ${propertyIds.length} imóveis...`);
+    console.log(`📋 Processando fila de ${propertyIds.length} imóveis...`);
 
     for (const id of propertyIds) {
-        console.log(`\n🔍 Lendo Ref #${id}...`);
+        console.log(`\n🔍 Processando Ref #${id}...`);
 
         try {
-            // 1. Abre o detalhe do imóvel
+            // 2. Abre o detalhe do imóvel
             await page.evaluate((rowId) => {
                 const row = document.querySelector(`tr[data-rowid="${rowId}"]`) as HTMLElement;
                 if (row) row.click();
             }, id);
 
-            // Espera o modal/página carregar (ajuste se necessário)
-            await new Promise(r => setTimeout(r, 3000));
+            // Espera o carregamento inicial do modal
+            await new Promise(r => setTimeout(r, 2500));
 
-            // 2. Extração de Dados (Lógica Melhorada)
+            // --- 3. ESTRATÉGIA IMAGEM HD: SIMULA CLIQUE NA GALERIA ---
+            try {
+                // Tenta clicar na primeira imagem ou container de fotos para abrir o Lightbox/Modal de fotos
+                const gallerySelector = 'img[src*="/imoveis/"], #div_fotos img, .galeria img';
+                const hasGallery = await page.$(gallerySelector);
+                
+                if (hasGallery) {
+                    await page.click(gallerySelector);
+                    // Espera o modal de fotos abrir e carregar as versões HD
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            } catch (e) {
+                console.log('   ⚠️ Aviso: Não foi possível abrir a galeria automática (tentando extração direta).');
+            }
+
+            // 4. EXTRAÇÃO DE DADOS (No contexto do navegador)
             const data: any = await page.evaluate(() => {
                 
-                // Função auxiliar que tenta pegar valor pelo ID
+                // Funções Auxiliares Internas
                 const getVal = (id: string) => {
                     const el = document.getElementById(id) as HTMLInputElement;
-                    // Se não achar por ID, tenta por Name
                     if (!el) {
                         const elByName = document.querySelector(`[name="${id}"]`) as HTMLInputElement;
                         return elByName ? elByName.value : '';
@@ -78,8 +95,9 @@ export class ScraperService {
                 };
 
                 const getCheck = (id: string) => {
-                    const el = document.getElementById(id) as HTMLInputElement;
-                    return el ? el.checked : false;
+                    let el: any = document.getElementById(id);
+                    if (!el) el = document.querySelector(`[name="${id}"]`);
+                    return el ? (el.checked || el.value === 'on' || el.value === '1') : false;
                 };
 
                 const getSelectText = (id: string) => {
@@ -87,61 +105,91 @@ export class ScraperService {
                     return el && el.selectedOptions[0] ? el.selectedOptions[0].text : '';
                 };
 
-                // Lógica de Features (Mantida igual, pois estava funcionando)
+                // Coleta todas as características marcadas (Ambientes + Infra)
                 const getAllCheckedFeatures = () => {
                     const allChecked = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'));
                     const features: string[] = [];
-                    const ignoreList = ['placa', 'exclusivo', 'site', 'destaque', 'financiamento', 'permuta', 'mcmv', 'veiculo', 'valor_promo', 'partir_de'];
+                    // Ignora checkboxes de configuração do sistema
+                    const ignoreList = ['placa', 'exclusivo', 'site', 'destaque', 'financiamento', 'permuta', 'mcmv', 'veiculo', 'valor_promo', 'partir_de', 'construtora'];
 
                     allChecked.forEach((input: any) => {
                         const id = input.id || input.name || '';
                         if (ignoreList.some(term => id.toLowerCase().includes(term))) return;
 
                         let labelText = '';
+                        // Tenta achar o texto do label de várias formas
                         if (input.parentElement.tagName === 'LABEL') {
                             labelText = input.parentElement.innerText;
                         } else if (input.id) {
                             const labelFor = document.querySelector(`label[for="${input.id}"]`);
                             if (labelFor) labelText = (labelFor as HTMLElement).innerText;
+                        } else if (input.nextSibling && input.nextSibling.nodeType === 3) {
+                            labelText = input.nextSibling.nodeValue;
                         }
                         
-                        if (labelText) features.push(labelText.trim());
+                        if (labelText && labelText.trim().length > 2) features.push(labelText.trim());
                     });
                     return features;
                 };
 
-                const imgs = Array.from(document.querySelectorAll('img'))
-                    .map(i => i.src)
-                    .filter(src => src.includes('/imoveis/') && !src.includes('bg.gif'));
+                // Lógica Robusta para Imagens HD
+                const getHighQualityImages = () => {
+                    const uniqueUrls = new Set<string>();
+
+                    // Pega todas as imagens (incluindo as do modal aberto)
+                    const allImgs = Array.from(document.querySelectorAll('img'));
+                    // Pega links que apontam para imagens (comum em lightboxes: <a href="big.jpg"><img src="small.jpg"></a>)
+                    const allAnchors = Array.from(document.querySelectorAll('a[href$=".jpg"], a[href$=".jpeg"], a[href$=".png"]'));
+
+                    // Prioridade 1: Links diretos (Geralmente HD)
+                    allAnchors.forEach((a: HTMLAnchorElement) => {
+                        if (a.href.includes('/imoveis/')) uniqueUrls.add(a.href);
+                    });
+
+                    // Prioridade 2: Imagens na tela (com limpeza de URL)
+                    allImgs.forEach((img: HTMLImageElement) => {
+                        const src = img.src;
+                        if (!src.includes('/imoveis/') || src.includes('bg.gif') || src.includes('pixel') || src.includes('layout')) return;
+
+                        // Tenta "adivinhar" a URL HD removendo sufixos de miniatura
+                        let hdSrc = src.replace(/_thumb/i, '')    // remove _thumb
+                                       .replace(/_p\./i, '.')     // _p.jpg -> .jpg
+                                       .replace(/_m\./i, '.')     // _m.jpg -> .jpg
+                                       .replace(/_mini\./i, '.')  // _mini.jpg -> .jpg
+                                       .replace(/\/thumbs\//i, '/fotos/') // pasta thumbs -> fotos
+                                       .replace(/sort/i, '');     // remove lixo de query params
+
+                        uniqueUrls.add(hdSrc);
+                    });
+
+                    return Array.from(uniqueUrls);
+                };
 
                 return {
+                    // Identificação e Valores
                     title: getVal('titulo') || getVal('nome_imovel'),
                     oldRef: getVal('referencia'),
                     categoryStr: getSelectText('tipo_id'),
                     
-                    // --- CORREÇÃO AQUI (Baseado no seu HTML) ---
-                    price: getVal('valor_cheio'),           // ID confirmado no HTML
-                    iptuPrice: getVal('priv_valor_iptu'),   // ID confirmado no HTML
-                    condoFee: getVal('priv_valor_condominio'), // ID confirmado no HTML
+                    price: getVal('valor_cheio'),           // ID correto
+                    iptuPrice: getVal('priv_valor_iptu'),   // ID correto
+                    condoFee: getVal('priv_valor_condominio'), // ID correto
                     promotionalPrice: getVal('valor_promo'),
-
                     hasDiscount: getCheck('com_valor_promo'),
                     
                     // Finalidades
-                    isSale: true, // Se apareceu o div_venda, assume venda (simplificação)
-                    
-                    // Áreas
+                    isSale: true, // Assume venda pois veio do div_venda
+
+                    // Detalhes Técnicos
                     privateArea: getVal('area_privativa'),
                     totalArea: getVal('area_total'),
-                    
-                    // Detalhes Internos
                     bedrooms: getVal('dormitorios'),
                     suites: getVal('suites'),
                     bathrooms: getVal('bwcs'),
                     garageSpots: getVal('garagens'),
                     garageType: getSelectText('garagens_tipo'),
                     
-                    // Endereço
+                    // Localização
                     zipCode: getVal('priv_end_cep'),
                     street: getVal('priv_end_rua'),
                     number: getVal('priv_end_numero'),
@@ -152,22 +200,26 @@ export class ScraperService {
                     // Descrição
                     description: getVal('descricao'),
                     
+                    // Listas Complexas
                     features: getAllCheckedFeatures(),
-                    images: imgs,
+                    images: getHighQualityImages(),
 
-                    // Checks (IDs confirmados no seu HTML)
+                    // Negociação
                     acceptsFinancing: getCheck('aceita_financiamento'),
                     acceptsConstructionFinancing: getCheck('financiamento_construtora'),
                     acceptsTrade: getCheck('permuta'),
                     acceptsVehicle: getCheck('aceita_veiculo'),
-                    isMcmv: getCheck('mcmv')
+                    isMcmv: getCheck('mcmv'),
+                    
+                    // Privados
+                    ownerName: getVal('priv_proprietario'),
+                    ownerPhone: getVal('priv_telefones')
                 };
             });
 
-            // 3. Tratamento dos Dados (NodeJS)
+            // 5. PROCESSAMENTO E SALVAMENTO (NodeJS)
             const cleanMoney = (val: string) => {
                 if (!val) return 0;
-                // Remove tudo que não é número ou vírgula, troca vírgula por ponto
                 let clean = String(val).replace(/[^0-9,]/g, '').replace(',', '.');
                 return parseFloat(clean) || 0;
             };
@@ -178,7 +230,7 @@ export class ScraperService {
                 return parseInt(clean) || 0;
             };
 
-            // Categorização do Imóvel
+            // Categorização
             let category = PropertyCategory.APARTAMENTO;
             const catLower = (data.categoryStr || '').toLowerCase();
             if (catLower.includes('casa')) category = PropertyCategory.CASA;
@@ -186,24 +238,13 @@ export class ScraperService {
             if (catLower.includes('comercial') || catLower.includes('sala')) category = PropertyCategory.SALA_COMERCIAL;
             if (catLower.includes('cobertura')) category = PropertyCategory.COBERTURA;
 
-            // --- CATEGORIZAÇÃO INTELIGENTE DE FEATURES (Ambientes vs Infra) ---
+            // Separação Inteligente de Features (Ambientes vs Lazer)
             const roomFeatures: string[] = [];
             const propertyFeatures: string[] = [];
             const developmentFeatures: string[] = [];
             
-            // Lista expandida de palavras-chave para detectar AMBIENTES
-            const roomKeywords = [
-                'sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço', 
-                'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'jardim de inverno', 
-                'churrasqueira na sacada', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'
-            ];
-
-            // Lista expandida para EMPREENDIMENTO (Lazer/Prédio)
-            const devKeywords = [
-                'piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'gerador', 'portaria', 
-                'zelador', 'playground', 'brinquedoteca', 'quadra', 'kiosk', 'spa', 'sauna', 'cinema', 
-                'game', 'pub', 'bar', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet'
-            ];
+            const roomKeywords = ['sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço', 'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'];
+            const devKeywords = ['piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'gerador', 'portaria', 'zelador', 'playground', 'brinquedoteca', 'quadra', 'kiosk', 'spa', 'sauna', 'cinema', 'game', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet'];
 
             (data.features || []).forEach((f: string) => {
                 if(!f) return;
@@ -214,12 +255,11 @@ export class ScraperService {
                 } else if (roomKeywords.some(k => lower.includes(k))) {
                     roomFeatures.push(f);
                 } else {
-                    // O resto vai para características gerais (Acabamento em gesso, piso, etc)
                     propertyFeatures.push(f);
                 }
             });
 
-            // Monta DTO
+            // Monta o DTO final
             const dto: CreatePropertyDto = {
                 title: data.title || `Ref #${id}`,
                 oldRef: String(id),
@@ -227,14 +267,12 @@ export class ScraperService {
                 transactionType: TransactionType.VENDA,
                 status: PropertyStatus.DISPONIVEL,
                 
-                // Valores Corrigidos
                 price: cleanMoney(data.price),
                 promotionalPrice: data.hasDiscount ? cleanMoney(data.promotionalPrice) : undefined,
                 condoFee: cleanMoney(data.condoFee),
                 iptuPrice: cleanMoney(data.iptuPrice),
 
-                // Áreas e Cômodos
-                privateArea: cleanMoney(data.privateArea), // usa cleanMoney pois pode ter virgula
+                privateArea: cleanMoney(data.privateArea),
                 totalArea: cleanMoney(data.totalArea),
                 bedrooms: cleanNum(data.bedrooms),
                 suites: cleanNum(data.suites),
@@ -242,7 +280,6 @@ export class ScraperService {
                 garageSpots: cleanNum(data.garageSpots),
                 garageType: data.garageType,
 
-                // Endereço
                 address: {
                     zipCode: data.zipCode || '',
                     street: data.street || '',
@@ -252,43 +289,47 @@ export class ScraperService {
                     state: 'SC'
                 },
                 buildingName: data.buildingName,
+                
+                ownerName: data.ownerName,
+                ownerPhone: data.ownerPhone,
 
-                // Listas Corrigidas
                 roomFeatures: [...new Set(roomFeatures)],
                 propertyFeatures: [...new Set(propertyFeatures)],
                 developmentFeatures: [...new Set(developmentFeatures)],
 
                 description: data.description ? data.description.replace(/<[^>]*>?/gm, '\n').trim() : '',
                 
-                // Booleanos
+                isSale: true,
                 acceptsFinancing: data.acceptsFinancing,
                 acceptsTrade: data.acceptsTrade,
                 acceptsVehicle: data.acceptsVehicle,
-                isSale: true,
+                acceptsConstructionFinancing: data.acceptsConstructionFinancing,
+                isMcmv: data.isMcmv,
 
-                // Imagens (Pega só as 20 primeiras para não pesar)
-                images: [...new Set(data.images as string[])].slice(0, 20).map((url: string, index: number) => ({ 
+                // Imagens HD (Limitando a 30 para não estourar o banco)
+                images: [...new Set(data.images as string[])].slice(0, 30).map((url: string, index: number) => ({ 
                     url, 
                     isCover: index === 0 
                 })),
             };
 
-            console.log(`   ✅ Encontrado: ${dto.title} | Cond: ${dto.condoFee} | IPTU: ${dto.iptuPrice} | Ambientes: ${dto.roomFeatures?.length}`);
+            console.log(`   ✅ Salvo: ${dto.title} | R$ ${dto.price} | Fotos: ${dto.images?.length}`);
 
-            // Salva no Banco
+            // Tenta salvar (se já existir, o Prisma pode reclamar dependendo da config, mas o try/catch segura)
             await this.propertiesService.create(dto);
-            
-            // Fecha modal (Esc) para ir para o próximo
+
+            // Fecha Modais (Tecla Esc) para garantir que a próxima iteração comece limpa
             await page.keyboard.press('Escape');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 800)); // Pequena pausa para UI reagir
 
         } catch (error) {
-            console.error(`❌ Erro no #${id}:`, error);
+            console.error(`   ❌ Erro na Ref #${id}:`, error.message);
+            // Tenta recuperar fechando qualquer coisa aberta
             try { await page.keyboard.press('Escape'); } catch(e){}
         }
     }
     
     console.log("🏁 Importação finalizada.");
-    // await browser.close(); // Comentei para você ver o resultado se quiser
+    // await browser.close(); // Mantenha comentado para debug visual
   }
 }
