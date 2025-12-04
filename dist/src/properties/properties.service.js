@@ -60,17 +60,32 @@ let PropertiesService = class PropertiesService {
         this.prisma = prisma;
     }
     async create(createPropertyDto) {
-        const { address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = createPropertyDto;
+        if (createPropertyDto.url && (!createPropertyDto.title || createPropertyDto.title === 'Imóvel sem Título')) {
+            return this.importFromDwv(createPropertyDto.url);
+        }
+        const { address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, url, category, ...propertyData } = createPropertyDto;
+        const safePrice = isNaN(Number(propertyData.price)) ? 0 : Number(propertyData.price);
+        const safePrivateArea = isNaN(Number(propertyData.privateArea)) ? 0 : Number(propertyData.privateArea);
+        const safeTitle = (propertyData.title && propertyData.title.trim() !== '') ? propertyData.title : 'Imóvel Importado';
+        const safeCategory = category || create_property_dto_1.PropertyCategory.APARTAMENTO;
         return await this.prisma.property.create({
             data: {
                 ...propertyData,
-                price: Number(propertyData.price),
-                privateArea: Number(propertyData.privateArea),
+                title: safeTitle,
+                category: safeCategory,
+                price: safePrice,
+                privateArea: safePrivateArea,
                 totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
                 garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
                 constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
-                address: address ? { create: { ...address } } : undefined,
+                address: address ? {
+                    create: {
+                        street: address.street || 'Não informada', number: address.number || 'S/N',
+                        neighborhood: address.neighborhood || 'Centro', city: address.city || 'Balneário Camboriú',
+                        state: address.state || 'SC', zipCode: address.zipCode || '88330-000', complement: address.complement || ''
+                    }
+                } : undefined,
                 roomFeatures: (roomFeatures && roomFeatures.length > 0) ? {
                     connectOrCreate: roomFeatures.map(name => ({ where: { name }, create: { name } }))
                 } : undefined,
@@ -87,29 +102,21 @@ let PropertiesService = class PropertiesService {
                     createMany: { data: paymentConditions.map(c => ({ description: c.description, value: c.value })) }
                 } : undefined,
             },
-            include: {
-                address: true,
-                roomFeatures: true,
-                propertyFeatures: true,
-                developmentFeatures: true,
-                images: true
-            }
+            include: { address: true, images: true }
         });
     }
     async findAll(filters) {
         const where = {};
         if (filters?.search) {
             const searchVal = filters.search.trim();
-            if (!isNaN(Number(searchVal))) {
+            if (!isNaN(Number(searchVal)))
                 where.OR = [{ id: Number(searchVal) }];
-            }
-            else {
+            else
                 where.OR = [
                     { title: { contains: searchVal, mode: 'insensitive' } },
                     { buildingName: { contains: searchVal, mode: 'insensitive' } },
                     { oldRef: { contains: searchVal, mode: 'insensitive' } }
                 ];
-            }
         }
         if (filters?.city)
             where.address = { ...where.address, city: { contains: filters.city, mode: 'insensitive' } };
@@ -159,28 +166,18 @@ let PropertiesService = class PropertiesService {
                 badgeText: true, badgeColor: true, buildingName: true,
                 constructionStage: true,
                 address: { select: { city: true, neighborhood: true, state: true } },
-                images: {
-                    take: 20,
-                    select: { url: true, isCover: true },
-                    orderBy: { isCover: 'desc' }
-                },
+                images: { take: 30, select: { url: true, isCover: true }, orderBy: { isCover: 'desc' } },
                 createdAt: true, updatedAt: true
             }
         });
     }
     async findOne(id) {
-        if (!id || isNaN(id)) {
-            throw new common_1.NotFoundException(`ID inválido fornecido.`);
-        }
+        if (!id || isNaN(id))
+            throw new common_1.NotFoundException(`ID inválido.`);
         const property = await this.prisma.property.findUnique({
             where: { id },
             include: {
-                address: true,
-                images: true,
-                roomFeatures: true,
-                propertyFeatures: true,
-                developmentFeatures: true,
-                paymentConditions: true
+                address: true, images: true, roomFeatures: true, propertyFeatures: true, developmentFeatures: true, paymentConditions: true
             }
         });
         if (!property)
@@ -189,7 +186,7 @@ let PropertiesService = class PropertiesService {
     }
     async update(id, updatePropertyDto) {
         await this.findOne(id);
-        const { id: _id, addressId, createdAt, updatedAt, address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
+        const { id: _id, addressId, createdAt, updatedAt, address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, url, ...propertyData } = updatePropertyDto;
         return this.prisma.property.update({
             where: { id: Number(id) },
             data: {
@@ -210,54 +207,26 @@ let PropertiesService = class PropertiesService {
                 address: address ? {
                     upsert: {
                         create: {
-                            street: address.street,
-                            number: address.number,
-                            neighborhood: address.neighborhood,
-                            city: address.city,
-                            state: address.state,
-                            zipCode: address.zipCode,
+                            street: address.street || '', number: address.number || 'S/N',
+                            neighborhood: address.neighborhood || '', city: address.city || '',
+                            state: address.state || 'SC', zipCode: address.zipCode || '',
                             complement: address.complement
                         },
                         update: {
-                            street: address.street,
-                            number: address.number,
-                            neighborhood: address.neighborhood,
-                            city: address.city,
-                            state: address.state,
-                            zipCode: address.zipCode,
-                            complement: address.complement
+                            street: address.street, number: address.number, neighborhood: address.neighborhood,
+                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
                         },
                     },
                 } : undefined,
-                roomFeatures: roomFeatures ? {
-                    set: [],
-                    connectOrCreate: roomFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
-                } : undefined,
-                propertyFeatures: propertyFeatures ? {
-                    set: [],
-                    connectOrCreate: propertyFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
-                } : undefined,
-                developmentFeatures: developmentFeatures ? {
-                    set: [],
-                    connectOrCreate: developmentFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
-                } : undefined,
+                roomFeatures: roomFeatures ? { set: [], connectOrCreate: roomFeatures.map((f) => ({ where: { name: f }, create: { name: f } })) } : undefined,
+                propertyFeatures: propertyFeatures ? { set: [], connectOrCreate: propertyFeatures.map((f) => ({ where: { name: f }, create: { name: f } })) } : undefined,
+                developmentFeatures: developmentFeatures ? { set: [], connectOrCreate: developmentFeatures.map((f) => ({ where: { name: f }, create: { name: f } })) } : undefined,
                 images: images ? {
                     deleteMany: {},
-                    createMany: {
-                        data: images.map((img) => ({
-                            url: img.url,
-                            isCover: img.isCover || false
-                        }))
-                    }
+                    createMany: { data: images.map((img) => ({ url: img.url, isCover: img.isCover || false })) }
                 } : undefined,
             },
-            include: {
-                address: true,
-                roomFeatures: true,
-                propertyFeatures: true,
-                developmentFeatures: true,
-                images: true
-            }
+            include: { address: true, images: true }
         });
     }
     async remove(id) {
@@ -265,146 +234,151 @@ let PropertiesService = class PropertiesService {
         return this.prisma.property.delete({ where: { id } });
     }
     async importFromDwv(inputText) {
-        console.log(`--- PROCESSANDO IMPORTAÇÃO ---`);
+        console.log(`--- IMPORT DWV START ---`);
         if (!inputText || typeof inputText !== 'string')
-            throw new Error("Entrada inválida.");
-        const lines = inputText.split(/\r?\n|\s+/);
-        const dwvUrl = lines.find(line => line && line.includes('http'));
-        if (!dwvUrl)
-            throw new Error("Link não encontrado.");
-        let addressText = inputText.replace(dwvUrl, '').replace(/\n/g, ' ').trim();
-        addressText = addressText.replace(/,\s*-/, ',').trim();
-        const numberMatch = addressText.match(/(\d+)/);
-        const manualNumber = numberMatch ? numberMatch[0] : 'S/N';
-        let manualStreet = addressText.split(',')[0];
-        if (manualNumber !== 'S/N')
-            manualStreet = manualStreet.replace(manualNumber, '').trim();
-        let addressData = {
-            street: manualStreet || 'Importado (Verificar)',
-            number: manualNumber,
-            neighborhood: 'Centro',
-            city: 'Balneário Camboriú',
-            state: 'SC',
-            zipCode: '88330-000'
-        };
-        if (addressText.length > 5) {
-            try {
-                const query = `${addressText}, Brasil`;
-                const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`;
-                const { data: geoJson } = await axios_1.default.get(geoUrl, { headers: { 'User-Agent': 'App/1.0' }, timeout: 5000 });
-                if (geoJson && geoJson.length > 0) {
-                    const info = geoJson[0].address;
-                    addressData = {
-                        street: info.road || manualStreet,
-                        number: info.house_number || manualNumber,
-                        neighborhood: info.suburb || info.neighbourhood || 'Centro',
-                        city: info.city || info.town || 'Balneário Camboriú',
-                        state: 'SC',
-                        zipCode: info.postcode ? info.postcode.replace('-', '') : '88330000'
-                    };
-                }
-            }
-            catch (e) {
-                console.error("Geolocalização falhou.");
-            }
+            throw new common_1.BadRequestException("Texto inválido.");
+        const urlMatch = inputText.match(/https?:\/\/[^\s]+/);
+        if (!urlMatch)
+            throw new common_1.BadRequestException("Link não encontrado.");
+        const dwvUrl = urlMatch[0];
+        let addressText = inputText.replace(dwvUrl, '').trim().replace(/[\n\r]+/g, ' ').replace(/[,.-]+$/, '').trim();
+        let street = 'Não informado', number = 'S/N';
+        const numberMatch = addressText.match(/(\d+)(?!.*\d)/);
+        if (numberMatch) {
+            number = numberMatch[0];
+            street = addressText.includes(',') ? addressText.split(',')[0].trim() : addressText.replace(number, '').trim();
         }
-        const uploadDir = path.join(process.cwd(), 'uploads');
-        if (!fs.existsSync(uploadDir))
-            fs.mkdirSync(uploadDir, { recursive: true });
+        else {
+            street = addressText || 'Endereço não detectado';
+        }
+        street = street.replace(/[-–].*$/, '').trim();
         let html = '';
         try {
-            const { data } = await axios_1.default.get(dwvUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' },
-                timeout: 10000
-            });
-            html = data;
+            const response = await axios_1.default.get(dwvUrl, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120.0' }, timeout: 15000 });
+            html = response.data;
         }
         catch (e) {
-            throw new Error("Erro ao acessar DWV.");
+            throw new common_1.BadRequestException(`Erro DWV: ${e.message}`);
         }
         const $ = cheerio.load(html);
-        const building = $('h2').first().text().trim();
-        const unit = $('p').first().text().trim();
-        const title = building ? `${building} ${unit}` : ($('title').text() || "Imóvel DWV");
         let price = 0;
-        $('h1, h2, h3').each((_, el) => {
+        $('h1, h2').each((_, el) => {
             const txt = $(el).text();
             if (txt.includes('R$') && price === 0)
                 price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
         });
-        let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0, totalArea = 0;
-        $('div').each((_, el) => {
-            const label = $(el).find('p, span, small').text().toLowerCase();
-            const valueTxt = $(el).find('h2, h3, strong').text().replace(',', '.');
-            const value = parseFloat(valueTxt);
-            if (!isNaN(value)) {
-                if (label.includes('dorm'))
-                    bedrooms = value;
-                if (label.includes('suítes'))
-                    suites = value;
-                if (label.includes('vagas'))
-                    garageSpots = value;
-                if (label.includes('privati'))
-                    privateArea = value;
-                if (label.includes('total'))
-                    totalArea = value;
-            }
-        });
-        const rawFeatures = [];
-        $('li, p, span').each((_, item) => {
-            const feat = $(item).text().trim();
-            if (feat.length > 2 && !feat.includes('R$') && !feat.includes(':'))
-                rawFeatures.push(feat);
-        });
-        const allText = rawFeatures.join(' ').toLowerCase() + ' ' + html.toLowerCase();
-        const isFurnished = allText.includes('mobiliado') && !allText.includes('semimobiliado');
-        const isSeaFront = allText.includes('frente mar') || allText.includes('frente para o mar');
-        const isHighStandard = allText.includes('alto padrão');
-        const developmentFeatures = [];
+        let buildingName = '';
+        const h2Text = $('h2').first().text().trim();
+        const pTorre = $('h2').first().next('p').text().trim();
+        if (h2Text && pTorre)
+            buildingName = `Unidade ${h2Text} - ${pTorre}`;
+        else
+            buildingName = $('title').text().trim();
+        const extractByAlt = (altKeywords) => {
+            let val = 0;
+            $('img').each((_, el) => {
+                const alt = $(el).attr('alt')?.toLowerCase() || '';
+                if (altKeywords.some(k => alt.includes(k))) {
+                    const h2 = $(el).parent().find('h2').text().trim();
+                    if (h2) {
+                        const num = parseFloat(h2.replace('m²', '').replace(',', '.'));
+                        if (!isNaN(num))
+                            val = num;
+                    }
+                }
+            });
+            return val;
+        };
+        const bedrooms = extractByAlt(['dorm', 'quarto']);
+        const suites = extractByAlt(['suíte']);
+        const bathrooms = extractByAlt(['banheiro']);
+        const garageSpots = extractByAlt(['garagem', 'vaga', 'carro']);
+        const privateArea = extractByAlt(['área privada', 'privativos', 'privativa']);
+        const totalArea = extractByAlt(['área total']);
         const propertyFeatures = [];
-        rawFeatures.forEach(f => {
-            const lower = f.toLowerCase();
-            if (['piscina', 'academia', 'salão', 'elevador', 'gerador'].some(k => lower.includes(k))) {
-                developmentFeatures.push(f);
+        const developmentFeatures = [];
+        const roomFeatures = [];
+        const devKeywords = ['piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'playground', 'brinquedoteca', 'quadra', 'spa', 'sauna', 'cinema', 'game', 'pub', 'bar', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet', 'coworking', 'medidores', 'gerador', 'portaria', 'zelador'];
+        const roomKeywords = ['sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço', 'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'];
+        const ignoreList = [
+            'galeria', 'torre', 'previsão', 'entrega', 'entrada', 'parcelamento', 'reforço', 'financiamento',
+            'dorm.', 'vagas', 'privativos', 'área total', 'banheiros', 'suítes', 'm²',
+            'fazer contra-proposta', 'unidade', 'empreendimento', 'gmail', 'hotmail', 'creci', 'contato', 'telefone'
+        ];
+        $('li').each((_, el) => {
+            const txt = $(el).text().trim();
+            const lower = txt.toLowerCase();
+            if (txt.length < 3)
+                return;
+            if (txt.length > 60)
+                return;
+            if (txt.includes('R$'))
+                return;
+            if (ignoreList.some(badWord => lower.includes(badWord)))
+                return;
+            if (devKeywords.some(k => lower.includes(k))) {
+                developmentFeatures.push(txt);
             }
-            else if (['sacada', 'piso', 'teto', 'cozinha', 'suíte'].some(k => lower.includes(k))) {
-                propertyFeatures.push(f);
+            else if (roomKeywords.some(k => lower.includes(k))) {
+                roomFeatures.push(txt);
+            }
+            else {
+                propertyFeatures.push(txt);
             }
         });
+        const paymentConditions = [];
+        $('h3').each((_, el) => {
+            const label = $(el).text().trim();
+            const container = $(el).closest('div').parent();
+            const valueText = container.find('p').first().text().trim();
+            if (['entrada', 'parcelas', 'reforço', 'financiamento'].some(k => label.toLowerCase().includes(k)) && valueText) {
+                paymentConditions.push({ description: `${label}: ${valueText}`, value: 0 });
+            }
+        });
+        const uploadDir = path.join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadDir))
+            fs.mkdirSync(uploadDir, { recursive: true });
         const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
         const matches = html.match(regex) || [];
-        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('logo') && u.length > 25).slice(0, 20);
+        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25);
+        const urlsToProcess = uniqueUrls.slice(0, 30);
         const processedImages = [];
-        for (const url of uniqueUrls) {
+        for (const url of urlsToProcess) {
             try {
-                const response = await axios_1.default.get(url, { responseType: 'arraybuffer', timeout: 5000 });
-                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 1000)}.webp`;
-                const filePath = path.join(uploadDir, randomName);
-                await (0, sharp_1.default)(response.data).resize(1280, 960, { fit: 'inside' }).webp({ quality: 80 }).toFile(filePath);
-                processedImages.push({ url: `http://127.0.0.1:3000/uploads/${randomName}`, isCover: processedImages.length === 0 });
+                const res = await axios_1.default.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+                if (res.data.length < 5000)
+                    continue;
+                const fname = `dwv-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
+                await (0, sharp_1.default)(res.data).resize(1280, 960, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(path.join(uploadDir, fname));
+                processedImages.push({
+                    url: `http://127.0.0.1:3000/uploads/${fname}`,
+                    isCover: processedImages.length === 0
+                });
             }
-            catch (err) { }
+            catch { }
         }
+        let title = $('h1').first().text().trim() || $('title').text().trim();
+        if (title.length > 80)
+            title = "Imóvel Importado DWV";
         const createDto = {
             title: title,
-            subtitle: building,
-            buildingName: building,
-            description: `Importado via DWV: ${dwvUrl}`,
+            subtitle: 'Balneário Camboriú',
             category: create_property_dto_1.PropertyCategory.APARTAMENTO,
             transactionType: create_property_dto_1.TransactionType.VENDA,
             status: create_property_dto_1.PropertyStatus.DISPONIVEL,
-            constructionStage: create_property_dto_1.ConstructionStage.PRONTO,
             price, bedrooms, suites, garageSpots, privateArea, totalArea,
-            showOnSite: true,
-            isExclusive: false,
-            isFurnished,
-            isSeaFront,
-            isHighStandard,
+            bathrooms: (bathrooms > 0) ? bathrooms : (suites + 1),
+            description: `Importado de: ${dwvUrl}`,
+            address: { street, number, neighborhood: 'Centro', city: 'Balneário Camboriú', state: 'SC', zipCode: '88330-000', complement: '' },
+            buildingName: buildingName,
+            isFurnished: propertyFeatures.some(f => f.toLowerCase().includes('mobiliado')),
+            roomFeatures: [...new Set(roomFeatures)],
             propertyFeatures: [...new Set(propertyFeatures)],
             developmentFeatures: [...new Set(developmentFeatures)],
-            images: processedImages,
-            address: addressData
+            paymentConditions,
+            images: processedImages
         };
+        console.log(`💾 Salvando: ${createDto.title} | ${processedImages.length} fotos | ${propertyFeatures.length + roomFeatures.length + developmentFeatures.length} caracteristicas`);
         return this.create(createDto);
     }
 };
