@@ -23,160 +23,229 @@ let ScraperService = class ScraperService {
         this.propertiesService = propertiesService;
     }
     async scrapeLegacySystem() {
-        console.log("🚀 Iniciando Robô de Migração V2 (Linux Fixed)...");
+        console.log("🚀 Iniciando Robô V10 (Correção IPTU, Condomínio e Ambientes)...");
         const browser = await puppeteer_1.default.launch({
             headless: false,
             defaultViewport: null,
             userDataDir: './puppeteer_data',
-            env: process.env,
             args: [
                 '--start-maximized',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--disable-accelerated-2d-canvas',
-                '--ozone-platform=x11',
-                '--display=:0'
-            ]
+                '--disable-dev-shm-usage',
+                '--ozone-platform=x11'
+            ],
         });
         const page = await browser.newPage();
-        console.log("🌐 Acessando Intranet...");
         try {
-            await page.goto('https://www.dbprivate.com.br/intranet/index/', {
-                waitUntil: 'domcontentloaded',
-                timeout: 60000
-            });
+            await page.goto('https://www.dbprivate.com.br/intranet/index/', { waitUntil: 'domcontentloaded' });
         }
         catch (e) {
-            console.log("⚠️ Página abriu (timeout ignorado).");
+            console.log('Erro ao abrir página inicial');
         }
-        console.log("⏳ Aguardando você estar na LISTA DE IMÓVEIS...");
-        console.log("👉 DICA: Faça login e vá para a aba Imóveis. O robô vai esperar.");
+        console.log("⏳ Aguardando lista de imóveis...");
         try {
-            await page.waitForSelector('tr[data-rowid]', { timeout: 120000 });
+            await page.waitForSelector('tr[data-rowid]', { timeout: 60000 });
         }
         catch (e) {
-            console.error("❌ Tempo esgotado! Navegue para a lista de imóveis.");
+            console.error("❌ Timeout: Lista não carregou.");
             await browser.close();
             return;
         }
-        console.log("✅ Lista detectada! Começando a leitura...");
         const propertyIds = await page.evaluate(() => {
-            const rows = document.querySelectorAll('tr[data-rowid]');
-            return Array.from(rows).map(row => row.getAttribute('data-rowid')).filter(id => id);
+            return Array.from(document.querySelectorAll('tr[data-rowid]'))
+                .map(row => row.getAttribute('data-rowid'))
+                .filter(id => id)
+                .slice(0, 5);
         });
-        console.log(`📋 Encontrados ${propertyIds.length} imóveis.`);
+        console.log(`📋 Processando amostra de ${propertyIds.length} imóveis...`);
         for (const id of propertyIds) {
-            console.log(`\n🔍 Processando Ref #${id}...`);
+            console.log(`\n🔍 Lendo Ref #${id}...`);
             try {
                 await page.evaluate((rowId) => {
                     const row = document.querySelector(`tr[data-rowid="${rowId}"]`);
                     if (row)
                         row.click();
                 }, id);
-                try {
-                    await page.waitForSelector('input[name="titulo"]', { timeout: 5000 });
-                }
-                catch (e) {
-                    console.warn(`⚠️ Modal não abriu para #${id}. Pulando.`);
-                    await page.keyboard.press('Escape');
-                    continue;
-                }
+                await new Promise(r => setTimeout(r, 3000));
                 const data = await page.evaluate(() => {
-                    const val = (name) => document.querySelector(`[name="${name}"]`)?.value || '';
-                    const check = (name) => document.querySelector(`[name="${name}"]`)?.checked || false;
+                    const getVal = (id) => {
+                        const el = document.getElementById(id);
+                        if (!el) {
+                            const elByName = document.querySelector(`[name="${id}"]`);
+                            return elByName ? elByName.value : '';
+                        }
+                        return el ? el.value : '';
+                    };
+                    const getCheck = (id) => {
+                        const el = document.getElementById(id);
+                        return el ? el.checked : false;
+                    };
+                    const getSelectText = (id) => {
+                        const el = document.getElementById(id);
+                        return el && el.selectedOptions[0] ? el.selectedOptions[0].text : '';
+                    };
+                    const getAllCheckedFeatures = () => {
+                        const allChecked = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'));
+                        const features = [];
+                        const ignoreList = ['placa', 'exclusivo', 'site', 'destaque', 'financiamento', 'permuta', 'mcmv', 'veiculo', 'valor_promo', 'partir_de'];
+                        allChecked.forEach((input) => {
+                            const id = input.id || input.name || '';
+                            if (ignoreList.some(term => id.toLowerCase().includes(term)))
+                                return;
+                            let labelText = '';
+                            if (input.parentElement.tagName === 'LABEL') {
+                                labelText = input.parentElement.innerText;
+                            }
+                            else if (input.id) {
+                                const labelFor = document.querySelector(`label[for="${input.id}"]`);
+                                if (labelFor)
+                                    labelText = labelFor.innerText;
+                            }
+                            if (labelText)
+                                features.push(labelText.trim());
+                        });
+                        return features;
+                    };
                     const imgs = Array.from(document.querySelectorAll('img'))
                         .map(i => i.src)
-                        .filter(src => src.includes('/imoveis/') && !src.includes('sort_desc'));
+                        .filter(src => src.includes('/imoveis/') && !src.includes('bg.gif'));
                     return {
-                        title: val('titulo'),
-                        oldRef: val('referencia'),
-                        categoryStr: document.querySelector('[name="tipo_imovel_id"] option:checked')?.textContent || '',
-                        price: val('valor_venda'),
-                        condoFee: val('valor_condominio'),
-                        iptuPrice: val('valor_iptu'),
-                        privateArea: val('area_privativa'),
-                        totalArea: val('area_total'),
-                        bedrooms: val('dormitorios'),
-                        suites: val('suites'),
-                        bathrooms: val('banheiros'),
-                        garageSpots: val('garagens'),
-                        zipCode: val('cep'),
-                        street: val('logradouro'),
-                        number: val('numero'),
-                        neighborhood: val('bairro'),
-                        buildingName: val('edificio_nome'),
-                        description: val('descricao'),
-                        ownerName: val('proprietario_nome'),
-                        ownerPhone: val('proprietario_telefone1'),
-                        ownerEmail: val('proprietario_email'),
-                        keysLocation: val('chaves_local'),
-                        isExclusive: check('exclusividade'),
-                        images: imgs
+                        title: getVal('titulo') || getVal('nome_imovel'),
+                        oldRef: getVal('referencia'),
+                        categoryStr: getSelectText('tipo_id'),
+                        price: getVal('valor_cheio'),
+                        iptuPrice: getVal('priv_valor_iptu'),
+                        condoFee: getVal('priv_valor_condominio'),
+                        promotionalPrice: getVal('valor_promo'),
+                        hasDiscount: getCheck('com_valor_promo'),
+                        isSale: true,
+                        privateArea: getVal('area_privativa'),
+                        totalArea: getVal('area_total'),
+                        bedrooms: getVal('dormitorios'),
+                        suites: getVal('suites'),
+                        bathrooms: getVal('bwcs'),
+                        garageSpots: getVal('garagens'),
+                        garageType: getSelectText('garagens_tipo'),
+                        zipCode: getVal('priv_end_cep'),
+                        street: getVal('priv_end_rua'),
+                        number: getVal('priv_end_numero'),
+                        neighborhood: getSelectText('bairro_id'),
+                        city: getSelectText('cidade_id'),
+                        buildingName: getVal('priv_end_edificio'),
+                        description: getVal('descricao'),
+                        features: getAllCheckedFeatures(),
+                        images: imgs,
+                        acceptsFinancing: getCheck('aceita_financiamento'),
+                        acceptsConstructionFinancing: getCheck('financiamento_construtora'),
+                        acceptsTrade: getCheck('permuta'),
+                        acceptsVehicle: getCheck('aceita_veiculo'),
+                        isMcmv: getCheck('mcmv')
                     };
                 });
-                if (!data.title || data.title.trim() === '') {
-                    console.warn(`⚠️ Dados vazios. Ignorando.`);
-                    await page.keyboard.press('Escape');
-                    continue;
-                }
-                const cleanMoney = (v) => parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+                const cleanMoney = (val) => {
+                    if (!val)
+                        return 0;
+                    let clean = String(val).replace(/[^0-9,]/g, '').replace(',', '.');
+                    return parseFloat(clean) || 0;
+                };
+                const cleanNum = (val) => {
+                    if (!val)
+                        return 0;
+                    let clean = String(val).replace(/[^0-9]/g, '');
+                    return parseInt(clean) || 0;
+                };
                 let category = create_property_dto_1.PropertyCategory.APARTAMENTO;
                 const catLower = (data.categoryStr || '').toLowerCase();
                 if (catLower.includes('casa'))
                     category = create_property_dto_1.PropertyCategory.CASA;
-                if (catLower.includes('terreno'))
+                if (catLower.includes('terreno') || catLower.includes('lote'))
                     category = create_property_dto_1.PropertyCategory.TERRENO;
                 if (catLower.includes('comercial') || catLower.includes('sala'))
                     category = create_property_dto_1.PropertyCategory.SALA_COMERCIAL;
+                if (catLower.includes('cobertura'))
+                    category = create_property_dto_1.PropertyCategory.COBERTURA;
+                const roomFeatures = [];
+                const propertyFeatures = [];
+                const developmentFeatures = [];
+                const roomKeywords = [
+                    'sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço',
+                    'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'jardim de inverno',
+                    'churrasqueira na sacada', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'
+                ];
+                const devKeywords = [
+                    'piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'gerador', 'portaria',
+                    'zelador', 'playground', 'brinquedoteca', 'quadra', 'kiosk', 'spa', 'sauna', 'cinema',
+                    'game', 'pub', 'bar', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet'
+                ];
+                (data.features || []).forEach((f) => {
+                    if (!f)
+                        return;
+                    const lower = f.toLowerCase();
+                    if (devKeywords.some(k => lower.includes(k))) {
+                        developmentFeatures.push(f);
+                    }
+                    else if (roomKeywords.some(k => lower.includes(k))) {
+                        roomFeatures.push(f);
+                    }
+                    else {
+                        propertyFeatures.push(f);
+                    }
+                });
                 const dto = {
-                    title: data.title,
+                    title: data.title || `Ref #${id}`,
                     oldRef: String(id),
                     category: category,
                     transactionType: create_property_dto_1.TransactionType.VENDA,
+                    status: create_property_dto_1.PropertyStatus.DISPONIVEL,
                     price: cleanMoney(data.price),
+                    promotionalPrice: data.hasDiscount ? cleanMoney(data.promotionalPrice) : undefined,
                     condoFee: cleanMoney(data.condoFee),
                     iptuPrice: cleanMoney(data.iptuPrice),
-                    bedrooms: Number(data.bedrooms) || 0,
-                    suites: Number(data.suites) || 0,
-                    bathrooms: Number(data.bathrooms) || 0,
-                    garageSpots: Number(data.garageSpots) || 0,
-                    privateArea: parseFloat(String(data.privateArea).replace(',', '.')) || 0,
-                    totalArea: parseFloat(String(data.totalArea).replace(',', '.')) || 0,
+                    privateArea: cleanMoney(data.privateArea),
+                    totalArea: cleanMoney(data.totalArea),
+                    bedrooms: cleanNum(data.bedrooms),
+                    suites: cleanNum(data.suites),
+                    bathrooms: cleanNum(data.bathrooms),
+                    garageSpots: cleanNum(data.garageSpots),
+                    garageType: data.garageType,
                     address: {
                         zipCode: data.zipCode || '',
                         street: data.street || '',
                         number: data.number || 'S/N',
                         neighborhood: data.neighborhood || '',
-                        city: 'Balneário Camboriú',
-                        state: 'SC',
-                        complement: ''
+                        city: data.city || 'Balneário Camboriú',
+                        state: 'SC'
                     },
                     buildingName: data.buildingName,
-                    description: data.description,
-                    ownerName: data.ownerName,
-                    ownerPhone: data.ownerPhone,
-                    ownerEmail: data.ownerEmail,
-                    keysLocation: data.keysLocation,
-                    showOnSite: true,
-                    isExclusive: data.isExclusive,
-                    images: [...new Set(data.images)].slice(0, 15).map((url) => ({ url, isCover: false })),
+                    roomFeatures: [...new Set(roomFeatures)],
+                    propertyFeatures: [...new Set(propertyFeatures)],
+                    developmentFeatures: [...new Set(developmentFeatures)],
+                    description: data.description ? data.description.replace(/<[^>]*>?/gm, '\n').trim() : '',
+                    acceptsFinancing: data.acceptsFinancing,
+                    acceptsTrade: data.acceptsTrade,
+                    acceptsVehicle: data.acceptsVehicle,
+                    isSale: true,
+                    images: [...new Set(data.images)].slice(0, 20).map((url, index) => ({
+                        url,
+                        isCover: index === 0
+                    })),
                 };
-                if (dto.images && dto.images.length > 0)
-                    dto.images[0].isCover = true;
-                console.log(`   💾 Salvando: ${dto.title}`);
+                console.log(`   ✅ Encontrado: ${dto.title} | Cond: ${dto.condoFee} | IPTU: ${dto.iptuPrice} | Ambientes: ${dto.roomFeatures?.length}`);
                 await this.propertiesService.create(dto);
-                console.log(`   ✅ Sucesso!`);
                 await page.keyboard.press('Escape');
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1000));
             }
             catch (error) {
-                console.error(`❌ Erro no #${id}. Tentando recuperar...`);
-                await page.keyboard.press('Escape');
+                console.error(`❌ Erro no #${id}:`, error);
+                try {
+                    await page.keyboard.press('Escape');
+                }
+                catch (e) { }
             }
         }
-        console.log("🏁 FIM.");
+        console.log("🏁 Importação finalizada.");
     }
 };
 exports.ScraperService = ScraperService;

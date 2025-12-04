@@ -1,2 +1,3 @@
-2025/12/04-16:18:46.096 13e3 Creating DB /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Site Characteristics Database since it was missing.
-2025/12/04-16:18:46.112 13e3 Reusing MANIFEST /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Site Characteristics Database/MANIFEST-000001
+2025/12/04-17:56:04.882 5b08 Reusing MANIFEST /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Site Characteristics Database/MANIFEST-000001
+2025/12/04-17:56:04.882 5b08 Recovering log #3
+2025/12/04-17:56:04.882 5b08 Reusing old log /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Site Characteristics Database/000003.log 

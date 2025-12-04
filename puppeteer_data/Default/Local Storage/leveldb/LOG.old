@@ -1,2 +1,3 @@
-2025/12/04-16:18:46.107 13eb Creating DB /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Local Storage/leveldb since it was missing.
-2025/12/04-16:18:46.132 13eb Reusing MANIFEST /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Local Storage/leveldb/MANIFEST-000001
+2025/12/04-17:56:04.888 5b18 Reusing MANIFEST /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Local Storage/leveldb/MANIFEST-000001
+2025/12/04-17:56:04.894 5b18 Recovering log #3
+2025/12/04-17:56:04.895 5b18 Reusing old log /home/matheus/IdeaProjects/realstateapp/dbprivateapp/puppeteer_data/Default/Local Storage/leveldb/000003.log 
