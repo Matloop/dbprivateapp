@@ -68,6 +68,7 @@ export declare class PropertiesController {
     }>;
     findAll(): Promise<{
         createdAt: Date;
+        updatedAt: Date;
         badgeText: string | null;
         badgeColor: string | null;
         title: string;
