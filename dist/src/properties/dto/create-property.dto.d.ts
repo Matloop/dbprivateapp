@@ -45,6 +45,7 @@ export declare class CreatePropertyDto {
     transactionType?: TransactionType;
     isExclusive: boolean;
     showOnSite: boolean;
+    buildingName?: string;
     exclusivityDocUrl?: string;
     registrationNumber?: string;
     price: number;

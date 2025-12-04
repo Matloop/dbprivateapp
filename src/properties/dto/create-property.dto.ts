@@ -65,6 +65,7 @@ class CreatePaymentConditionDto {
 // DTO PRINCIPAL
 
 export class CreatePropertyDto {
+
   @IsString() @IsNotEmpty() title: string;
   @IsString() @IsOptional() subtitle?: string;
   
@@ -73,6 +74,10 @@ export class CreatePropertyDto {
   
   @IsBoolean() isExclusive: boolean;
   @IsBoolean() showOnSite: boolean;
+
+  @IsString()
+  @IsOptional()
+  buildingName?: string;
   
   @IsString() @IsOptional() exclusivityDocUrl?: string;
   @IsString() @IsOptional() registrationNumber?: string;

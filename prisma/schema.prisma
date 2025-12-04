@@ -47,6 +47,8 @@ model Property {
   showOnSite   Boolean 
   isExclusive  Boolean
 
+  buildingName String?
+
   // Infos Básicas
   title             String
   subtitle          String?

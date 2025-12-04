@@ -121,6 +121,7 @@ let PropertiesService = class PropertiesService {
                 category: true,
                 status: true,
                 createdAt: true,
+                buildingName: true,
                 updatedAt: true,
                 badgeText: true,
                 badgeColor: true,

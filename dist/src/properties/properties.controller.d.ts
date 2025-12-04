@@ -42,6 +42,7 @@ export declare class PropertiesController {
         badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -71,6 +72,7 @@ export declare class PropertiesController {
         updatedAt: Date;
         badgeText: string | null;
         badgeColor: string | null;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -125,6 +127,7 @@ export declare class PropertiesController {
         badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -187,6 +190,7 @@ export declare class PropertiesController {
         badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -218,6 +222,7 @@ export declare class PropertiesController {
         badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -280,6 +285,7 @@ export declare class PropertiesController {
         badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
+        buildingName: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
