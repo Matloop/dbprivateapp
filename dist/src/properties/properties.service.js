@@ -110,28 +110,104 @@ let PropertiesService = class PropertiesService {
             }
         });
     }
-    async findAll() {
+    async findAll(filters) {
+        const where = {};
+        if (filters?.search) {
+            const searchVal = filters.search.trim();
+            if (!isNaN(Number(searchVal))) {
+                where.id = Number(searchVal);
+            }
+            else {
+                where.title = { contains: searchVal, mode: 'insensitive' };
+            }
+        }
+        if (filters?.city) {
+            where.address = {
+                ...where.address,
+                city: { contains: filters.city, mode: 'insensitive' }
+            };
+        }
+        if (filters?.neighborhood) {
+            where.address = {
+                ...where.address,
+                neighborhood: { contains: filters.neighborhood, mode: 'insensitive' }
+            };
+        }
+        if (filters?.minPrice || filters?.maxPrice) {
+            where.price = {};
+            if (filters.minPrice)
+                where.price.gte = Number(filters.minPrice);
+            if (filters.maxPrice)
+                where.price.lte = Number(filters.maxPrice);
+        }
+        if (filters?.minArea || filters?.maxArea) {
+            where.OR = [
+                {
+                    totalArea: {
+                        gte: filters.minArea ? Number(filters.minArea) : undefined,
+                        lte: filters.maxArea ? Number(filters.maxArea) : undefined,
+                    }
+                },
+                {
+                    privateArea: {
+                        gte: filters.minArea ? Number(filters.minArea) : undefined,
+                        lte: filters.maxArea ? Number(filters.maxArea) : undefined,
+                    }
+                }
+            ];
+        }
+        if (filters?.bedrooms)
+            where.bedrooms = { gte: Number(filters.bedrooms) };
+        if (filters?.garageSpots)
+            where.garageSpots = { gte: Number(filters.garageSpots) };
+        if (filters?.types) {
+            const types = Array.isArray(filters.types) ? filters.types : [filters.types];
+            const cleanTypes = types.filter((t) => t !== '');
+            if (cleanTypes.length > 0) {
+                where.category = { in: cleanTypes };
+            }
+        }
+        if (filters?.stage) {
+            where.constructionStage = filters.stage;
+        }
+        if (filters?.negotiation) {
+            const negs = Array.isArray(filters.negotiation) ? filters.negotiation : [filters.negotiation];
+            if (negs.includes('exclusivo'))
+                where.isExclusive = true;
+            if (negs.includes('permuta'))
+                where.acceptsTrade = true;
+            if (negs.includes('financiamento'))
+                where.acceptsFinancing = true;
+            if (negs.includes('veiculo'))
+                where.acceptsVehicle = true;
+        }
         return this.prisma.property.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
                 title: true,
-                subtitle: true,
                 price: true,
                 category: true,
                 status: true,
-                createdAt: true,
-                buildingName: true,
-                updatedAt: true,
+                bedrooms: true,
+                bathrooms: true,
+                garageSpots: true,
+                privateArea: true,
+                totalArea: true,
                 badgeText: true,
                 badgeColor: true,
+                buildingName: true,
+                constructionStage: true,
                 address: {
-                    select: { city: true, state: true, neighborhood: true }
+                    select: { city: true, neighborhood: true, state: true }
                 },
                 images: {
-                    select: { url: true, isCover: true }
+                    where: { isCover: true },
+                    take: 1,
+                    select: { url: true }
                 }
-            },
+            }
         });
     }
     async findOne(id) {

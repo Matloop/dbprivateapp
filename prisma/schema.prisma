@@ -41,11 +41,11 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  badgeText   String?  // Texto da tarja (Ex: "DECORADO CENTRO SUL")
-  badgeColor  String?  // Cor Hexadecimal ou Enum (Ex: "#007bff" ou "BLUE")
+  badgeText  String? // Texto da tarja (Ex: "DECORADO CENTRO SUL")
+  badgeColor String? // Cor Hexadecimal ou Enum (Ex: "#007bff" ou "BLUE")
 
-  showOnSite   Boolean 
-  isExclusive  Boolean
+  showOnSite  Boolean
+  isExclusive Boolean
 
   buildingName String?
 
@@ -53,8 +53,12 @@ model Property {
   title             String
   subtitle          String?
   category          PropertyCategory
-  transactionType   TransactionType @default(VENDA)
+  transactionType   TransactionType  @default(VENDA)
   exclusivityDocUrl String?
+
+  acceptsTrade     Boolean @default(false) // Aceita permuta
+  acceptsFinancing Boolean @default(false) // Aceita financiamento
+  acceptsVehicle   Boolean @default(false)
 
   // Localização
   address   Address? @relation(fields: [addressId], references: [id])
@@ -63,15 +67,16 @@ model Property {
   // Datas
   constructionStartDate DateTime?
   deliveryDate          DateTime?
+  constructionStage     ConstructionStage? @default(PRONTO)
 
   // Numéricos
-  bedrooms    Int     @default(0)
-  suites      Int     @default(0)
-  bathrooms   Int     @default(0)
-  garageSpots Int     @default(0)
-  
+  bedrooms    Int @default(0)
+  suites      Int @default(0)
+  bathrooms   Int @default(0)
+  garageSpots Int @default(0)
+
   registrationNumber String?
-  
+
   // Áreas
   garageArea  Float?
   privateArea Float
@@ -83,21 +88,27 @@ model Property {
   iptuPrice Decimal? @db.Decimal(10, 2)
 
   // Textos
-  description String?   @db.Text
-  brokerNotes String?   @db.Text
+  description String?        @db.Text
+  brokerNotes String?        @db.Text
   status      PropertyStatus @default(DISPONIVEL)
 
   // --- NOVOS RELACIONAMENTOS DE CARACTERÍSTICAS ---
-  
+
   // Características da Unidade (ex: Mobiliado, Churrasqueira a carvão)
-  propertyFeatures PropertyFeature[] 
-  
+  propertyFeatures PropertyFeature[]
+
   // Características do Empreendimento (ex: Piscina, Academia, Cinema)
   developmentFeatures DevelopmentFeature[]
 
   // Outros Relacionamentos
-  images PropertyImage[]
+  images            PropertyImage[]
   paymentConditions PaymentCondition[]
+}
+
+enum ConstructionStage {
+  LANCAMENTO
+  EM_OBRA
+  PRONTO
 }
 
 // --- ENDEREÇO ---
@@ -120,7 +131,7 @@ model PropertyImage {
   url     String
   isCover Boolean @default(false)
 
-  propertyId Int 
+  propertyId Int
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
@@ -128,15 +139,15 @@ model PropertyImage {
 
 // 1. Privativas (Do Imóvel)
 model PropertyFeature {
-  id   Int    @id @default(autoincrement())
-  name String @unique 
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
   properties Property[]
 }
 
 // 2. Comuns (Do Empreendimento)
 model DevelopmentFeature {
-  id   Int    @id @default(autoincrement())
-  name String @unique 
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
   properties Property[]
 }
 
@@ -152,8 +163,8 @@ model PaymentCondition {
 
 // --- USUÁRIO (Auth) ---
 model User {
-  id        String @id @db.Uuid
-  email     String @unique
+  id        String   @id @db.Uuid
+  email     String   @unique
   name      String?
   createdAt DateTime @default(now()) @map("created_at")
 }

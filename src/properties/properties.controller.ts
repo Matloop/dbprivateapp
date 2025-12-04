@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, BadRequestException, Query } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -17,7 +17,7 @@ export class PropertiesController {
   }
   
   @Get()
-  async findAll() {
+  async findAll(@Query() query: any) {
     console.time('AUTH_ATE_CONTROLLER'); 
     console.log('1. Passou pelo Auth Guard'); // Vai aparecer instantâneo
 
@@ -26,7 +26,7 @@ export class PropertiesController {
     console.log('2. Prisma retornou dados'); // Vai demorar 5 segundos para aparecer
     console.timeEnd('AUTH_ATE_CONTROLLER');
   
-    return this.propertiesService.findAll();
+    return this.propertiesService.findAll(query);
   }
 
   @Get(':id')

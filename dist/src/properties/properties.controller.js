@@ -28,13 +28,13 @@ let PropertiesController = class PropertiesController {
     create(createPropertyDto) {
         return this.propertiesService.create(createPropertyDto);
     }
-    async findAll() {
+    async findAll(query) {
         console.time('AUTH_ATE_CONTROLLER');
         console.log('1. Passou pelo Auth Guard');
         const result = await this.propertiesService.findAll();
         console.log('2. Prisma retornou dados');
         console.timeEnd('AUTH_ATE_CONTROLLER');
-        return this.propertiesService.findAll();
+        return this.propertiesService.findAll(query);
     }
     findOne(id) {
         return this.propertiesService.findOne(+id);
@@ -70,8 +70,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], PropertiesController.prototype, "findAll", null);
 __decorate([

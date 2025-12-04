@@ -7,6 +7,20 @@ import * as path from 'path';
 import sharp from 'sharp';
 import axios from 'axios'; 
 
+interface FilterOptions {
+  city?: string;
+  neighborhood?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minArea?: number;
+  maxArea?: number;
+  bedrooms?: number;
+  garageSpots?: number;
+  types?: string[]; // Array de categorias (APARTAMENTO, CASA...)
+  negotiation?: string[]; // ['permuta', 'financiamento', 'exclusivo']
+  stage?: string; // 'PRONTO', 'EM_OBRA'...
+}
+
 @Injectable()
 export class PropertiesService {
 
@@ -89,31 +103,123 @@ export class PropertiesService {
   // ===========================================================================
   // FIND ALL
   // ===========================================================================
-  async findAll() {
+  async findAll(filters?: any) {
+    const where: any = {};
+
+    // --- 1. Busca por Texto (Referência ou Título) ---
+    if (filters?.search) {
+      const searchVal = filters.search.trim();
+      // Se for número, tenta buscar por ID, senão busca por título
+      if (!isNaN(Number(searchVal))) {
+        where.id = Number(searchVal);
+      } else {
+        where.title = { contains: searchVal, mode: 'insensitive' };
+      }
+    }
+
+    // --- 2. Localização ---
+    if (filters?.city) {
+      where.address = { 
+        ...where.address, // Mantém filtros anteriores de endereço se houver
+        city: { contains: filters.city, mode: 'insensitive' } 
+      };
+    }
+    
+    // Filtro de Bairro (opcional, se vier do front)
+    if (filters?.neighborhood) {
+      where.address = { 
+        ...where.address,
+        neighborhood: { contains: filters.neighborhood, mode: 'insensitive' } 
+      };
+    }
+
+    // --- 3. Faixa de Preço ---
+    if (filters?.minPrice || filters?.maxPrice) {
+      where.price = {};
+      if (filters.minPrice) where.price.gte = Number(filters.minPrice);
+      if (filters.maxPrice) where.price.lte = Number(filters.maxPrice);
+    }
+
+    // --- 4. Áreas (Privativa e Total) ---
+    // Nota: O front manda 'minArea' (geralmente privativa ou total, decida qual filtrar)
+    // Aqui vou filtrar pela Área Total se ela existir, ou Privativa
+    if (filters?.minArea || filters?.maxArea) {
+      where.OR = [
+        {
+          totalArea: {
+            gte: filters.minArea ? Number(filters.minArea) : undefined,
+            lte: filters.maxArea ? Number(filters.maxArea) : undefined,
+          }
+        },
+        {
+          privateArea: {
+            gte: filters.minArea ? Number(filters.minArea) : undefined,
+            lte: filters.maxArea ? Number(filters.maxArea) : undefined,
+          }
+        }
+      ];
+    }
+
+    // --- 5. Dormitórios e Vagas ---
+    if (filters?.bedrooms) where.bedrooms = { gte: Number(filters.bedrooms) };
+    if (filters?.garageSpots) where.garageSpots = { gte: Number(filters.garageSpots) };
+
+    // --- 6. Tipo de Imóvel (Array) ---
+    // O front manda ?types=CASA&types=APARTAMENTO
+    if (filters?.types) {
+      const types = Array.isArray(filters.types) ? filters.types : [filters.types];
+      // Garante que o array não tenha strings vazias
+      const cleanTypes = types.filter((t: string) => t !== '');
+      if (cleanTypes.length > 0) {
+        where.category = { in: cleanTypes };
+      }
+    }
+
+    // --- 7. Estágio da Obra ---
+    if (filters?.stage) {
+      where.constructionStage = filters.stage; // Espera: 'LANCAMENTO', 'EM_OBRA', 'PRONTO'
+    }
+
+    // --- 8. Negociação (Mapeamento Complexo) ---
+    // O front manda array de strings: ['exclusivo', 'permuta', 'financiamento']
+    // O banco tem colunas booleanas separadas.
+    if (filters?.negotiation) {
+      const negs = Array.isArray(filters.negotiation) ? filters.negotiation : [filters.negotiation];
+      
+      if (negs.includes('exclusivo')) where.isExclusive = true;
+      if (negs.includes('permuta')) where.acceptsTrade = true;
+      if (negs.includes('financiamento')) where.acceptsFinancing = true;
+      if (negs.includes('veiculo')) where.acceptsVehicle = true;
+    }
+
     return this.prisma.property.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
+      // Trazendo todos os campos necessários para o Card
       select: {
         id: true,
         title: true,
-        subtitle: true,
         price: true,
         category: true,
         status: true,
-        createdAt: true,
-        buildingName: true, 
-
-        updatedAt: true,
+        bedrooms: true,
+        bathrooms: true,
+        garageSpots: true,
+        privateArea: true,
+        totalArea: true,
         badgeText: true,
         badgeColor: true,
+        buildingName: true,
+        constructionStage: true,
         address: {
-          select: { city: true, state: true, neighborhood: true }
+          select: { city: true, neighborhood: true, state: true }
         },
-        // Traz todas as imagens (Front filtra a capa na tabela e mostra o resto no modal)
         images: {
-          select: { url: true, isCover: true }
-         
+          where: { isCover: true },
+          take: 1,
+          select: { url: true }
         }
-      },
+      }
     });
   }
 

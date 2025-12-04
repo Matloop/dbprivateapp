@@ -48,8 +48,12 @@ export declare class PropertiesController {
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
+        acceptsTrade: boolean;
+        acceptsFinancing: boolean;
+        acceptsVehicle: boolean;
         constructionStartDate: Date | null;
         deliveryDate: Date | null;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
@@ -67,15 +71,18 @@ export declare class PropertiesController {
         id: number;
         addressId: number | null;
     }>;
-    findAll(): Promise<{
-        createdAt: Date;
-        updatedAt: Date;
+    findAll(query: any): Promise<{
         badgeText: string | null;
         badgeColor: string | null;
         buildingName: string | null;
         title: string;
-        subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
+        bedrooms: number;
+        bathrooms: number;
+        garageSpots: number;
+        privateArea: number;
+        totalArea: number | null;
         price: import("@prisma/client/runtime/library").Decimal;
         status: import(".prisma/client").$Enums.PropertyStatus;
         address: {
@@ -85,7 +92,6 @@ export declare class PropertiesController {
         } | null;
         images: {
             url: string;
-            isCover: boolean;
         }[];
         id: number;
     }[]>;
@@ -133,8 +139,12 @@ export declare class PropertiesController {
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
+        acceptsTrade: boolean;
+        acceptsFinancing: boolean;
+        acceptsVehicle: boolean;
         constructionStartDate: Date | null;
         deliveryDate: Date | null;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
@@ -196,8 +206,12 @@ export declare class PropertiesController {
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
+        acceptsTrade: boolean;
+        acceptsFinancing: boolean;
+        acceptsVehicle: boolean;
         constructionStartDate: Date | null;
         deliveryDate: Date | null;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
@@ -228,8 +242,12 @@ export declare class PropertiesController {
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
+        acceptsTrade: boolean;
+        acceptsFinancing: boolean;
+        acceptsVehicle: boolean;
         constructionStartDate: Date | null;
         deliveryDate: Date | null;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
@@ -291,8 +309,12 @@ export declare class PropertiesController {
         category: import(".prisma/client").$Enums.PropertyCategory;
         transactionType: import(".prisma/client").$Enums.TransactionType;
         exclusivityDocUrl: string | null;
+        acceptsTrade: boolean;
+        acceptsFinancing: boolean;
+        acceptsVehicle: boolean;
         constructionStartDate: Date | null;
         deliveryDate: Date | null;
+        constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
         suites: number;
         bathrooms: number;
