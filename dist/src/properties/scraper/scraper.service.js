@@ -23,7 +23,7 @@ let ScraperService = class ScraperService {
         this.propertiesService = propertiesService;
     }
     async scrapeLegacySystem() {
-        console.log("🚀 Iniciando Robô V13 (FULL: Imagens HD + Correção de Valores + Linux Fix)...");
+        console.log("🚀 Iniciando Robô V14 (FULL + Tarjas Importadas)...");
         const browser = await puppeteer_1.default.launch({
             headless: false,
             defaultViewport: null,
@@ -77,7 +77,7 @@ let ScraperService = class ScraperService {
                     }
                 }
                 catch (e) {
-                    console.log('   ⚠️ Aviso: Não foi possível abrir a galeria automática (tentando extração direta).');
+                    console.log('   ⚠️ Aviso: Não foi possível abrir a galeria automática.');
                 }
                 const data = await page.evaluate(() => {
                     const getVal = (id) => {
@@ -154,6 +154,8 @@ let ScraperService = class ScraperService {
                         condoFee: getVal('priv_valor_condominio'),
                         promotionalPrice: getVal('valor_promo'),
                         hasDiscount: getCheck('com_valor_promo'),
+                        badgeText: getVal('tarja'),
+                        badgeColorClass: getVal('tarja_cor'),
                         isSale: true,
                         privateArea: getVal('area_privativa'),
                         totalArea: getVal('area_total'),
@@ -192,6 +194,18 @@ let ScraperService = class ScraperService {
                     let clean = String(val).replace(/[^0-9]/g, '');
                     return parseInt(clean) || 0;
                 };
+                const mapBadgeColor = (className) => {
+                    switch (className) {
+                        case 'label-tema': return '#d4af37';
+                        case 'label-primary': return '#0d6efd';
+                        case 'label-success': return '#198754';
+                        case 'label-danger': return '#dc3545';
+                        case 'label-warning': return '#ffc107';
+                        case 'label-info': return '#0dcaf0';
+                        case 'label-default': return '#6c757d';
+                        default: return '#d4af37';
+                    }
+                };
                 let category = create_property_dto_1.PropertyCategory.APARTAMENTO;
                 const catLower = (data.categoryStr || '').toLowerCase();
                 if (catLower.includes('casa'))
@@ -227,6 +241,8 @@ let ScraperService = class ScraperService {
                     category: category,
                     transactionType: create_property_dto_1.TransactionType.VENDA,
                     status: create_property_dto_1.PropertyStatus.DISPONIVEL,
+                    badgeText: data.badgeText,
+                    badgeColor: mapBadgeColor(data.badgeColorClass),
                     price: cleanMoney(data.price),
                     promotionalPrice: data.hasDiscount ? cleanMoney(data.promotionalPrice) : undefined,
                     condoFee: cleanMoney(data.condoFee),
@@ -264,7 +280,7 @@ let ScraperService = class ScraperService {
                         isCover: index === 0
                     })),
                 };
-                console.log(`   ✅ Salvo: ${dto.title} | R$ ${dto.price} | Fotos: ${dto.images?.length}`);
+                console.log(`   ✅ Salvo: ${dto.title} | Tarja: ${dto.badgeText || 'Nenhuma'}`);
                 await this.propertiesService.create(dto);
                 await page.keyboard.press('Escape');
                 await new Promise(r => setTimeout(r, 800));
