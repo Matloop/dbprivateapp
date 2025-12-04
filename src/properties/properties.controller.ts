@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, BadRequestException } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -45,7 +45,20 @@ export class PropertiesController {
   }
 
   @Post('import-dwv')
-  async importDwv(@Body() body: { url: string }) {
-    return this.propertiesService.importFromDwv(body.url);
+  async importDwv(@Body() body: any) { // <--- O SEGREDO É USAR 'any' AQUI
+    // Verifica se o campo existe
+    if (!body || !body.url) {
+        throw new BadRequestException("O corpo da requisição deve conter { url: 'texto...' }");
+    }
+
+    const inputText = body.url;
+
+    // Verifica se é string
+    if (typeof inputText !== 'string') {
+        throw new BadRequestException("O campo 'url' deve ser um texto.");
+    }
+
+    // Chama o serviço
+    return this.propertiesService.importFromDwv(inputText);
   }
 }

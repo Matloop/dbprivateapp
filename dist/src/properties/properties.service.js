@@ -53,6 +53,7 @@ const cheerio = __importStar(require("cheerio"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const sharp_1 = __importDefault(require("sharp"));
+const axios_1 = __importDefault(require("axios"));
 let PropertiesService = class PropertiesService {
     prisma;
     constructor(prisma) {
@@ -218,22 +219,75 @@ let PropertiesService = class PropertiesService {
             where: { id }
         });
     }
-    async importFromDwv(dwvUrl) {
-        console.log(`--- IMPORTAÇÃO OTIMIZADA: ${dwvUrl} ---`);
+    async importFromDwv(inputText) {
+        console.log(`--- PROCESSANDO IMPORTAÇÃO ---`);
+        if (!inputText || typeof inputText !== 'string') {
+            throw new Error("Texto de entrada inválido.");
+        }
+        const lines = inputText.split(/\r?\n|\s+/);
+        const dwvUrl = lines.find(line => line && line.includes('http'));
+        if (!dwvUrl)
+            throw new Error("Link não encontrado.");
+        let addressText = inputText
+            .replace(dwvUrl, '')
+            .replace(/\n/g, ' ')
+            .trim();
+        addressText = addressText.replace(/,\s*-/, ',').trim();
+        console.log(`URL: ${dwvUrl}`);
+        console.log(`Endereço Texto: ${addressText}`);
+        const numberMatch = addressText.match(/(\d+)/);
+        const manualNumber = numberMatch ? numberMatch[0] : 'S/N';
+        let manualStreet = addressText.split(',')[0];
+        if (manualNumber !== 'S/N') {
+            manualStreet = manualStreet.replace(manualNumber, '').trim();
+        }
+        let addressData = {
+            street: manualStreet || 'Importado (Verificar)',
+            number: manualNumber,
+            neighborhood: 'Centro',
+            city: 'Balneário Camboriú',
+            state: 'SC',
+            zipCode: '88330-000'
+        };
+        if (addressText.length > 5) {
+            try {
+                console.log("Buscando endereço na API...");
+                const query = `${addressText}, Brasil`;
+                const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`;
+                const { data: geoJson } = await axios_1.default.get(geoUrl, {
+                    headers: { 'User-Agent': 'RealEstateApp/1.0' },
+                    timeout: 5000
+                });
+                if (geoJson && geoJson.length > 0) {
+                    const info = geoJson[0].address;
+                    console.log("API Encontrou:", info);
+                    addressData = {
+                        street: info.road || info.pedestrian || manualStreet,
+                        number: info.house_number || manualNumber,
+                        neighborhood: info.suburb || info.neighbourhood || info.quarter || 'Centro',
+                        city: info.city || info.town || info.village || 'Balneário Camboriú',
+                        state: this.mapStateToAbbreviation(info.state) || 'SC',
+                        zipCode: info.postcode ? info.postcode.replace('-', '') : '88330000'
+                    };
+                }
+            }
+            catch (error) {
+                console.error("Geolocalização falhou. Usando dados manuais.");
+            }
+        }
         const uploadDir = path.join(process.cwd(), 'uploads');
         if (!fs.existsSync(uploadDir))
             fs.mkdirSync(uploadDir, { recursive: true });
         let html = '';
         try {
-            const response = await fetch(dwvUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+            const { data } = await axios_1.default.get(dwvUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36' },
+                timeout: 10000
             });
-            html = await response.text();
+            html = data;
         }
         catch (e) {
-            throw new Error("Erro ao baixar site. Verifique a URL.");
+            throw new Error("Erro ao baixar o site do DWV.");
         }
         const $ = cheerio.load(html);
         const building = $('h2').first().text().trim();
@@ -270,9 +324,8 @@ let PropertiesService = class PropertiesService {
             const isDevSection = text.includes('empreendimento') || text.includes('lazer') || text.includes('condomínio');
             if (isUnitSection || isDevSection) {
                 let $nextContainer = $(el).next();
-                if (!$nextContainer.is('ul') && !$nextContainer.is('div')) {
+                if (!$nextContainer.is('ul') && !$nextContainer.is('div'))
                     $nextContainer = $nextContainer.next();
-                }
                 const items = [];
                 $nextContainer.find('li, p, span').each((_, item) => {
                     const feat = $(item).text().trim();
@@ -294,21 +347,14 @@ let PropertiesService = class PropertiesService {
         const processedImages = [];
         for (let i = 0; i < urlsToProcess.length; i++) {
             try {
-                const imgUrl = urlsToProcess[i];
-                const imgResp = await fetch(imgUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-                if (!imgResp.ok)
-                    continue;
-                const arrayBuffer = await imgResp.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
+                const response = await axios_1.default.get(urlsToProcess[i], { responseType: 'arraybuffer', timeout: 5000 });
+                const buffer = Buffer.from(response.data);
                 if (buffer.length < 5000)
                     continue;
                 const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.webp`;
                 const filePath = path.join(uploadDir, randomName);
                 await (0, sharp_1.default)(buffer)
-                    .resize(1280, 960, {
-                    fit: 'inside',
-                    withoutEnlargement: true
-                })
+                    .resize(1280, 960, { fit: 'inside', withoutEnlargement: true })
                     .webp({ quality: 80 })
                     .toFile(filePath);
                 processedImages.push({
@@ -316,9 +362,7 @@ let PropertiesService = class PropertiesService {
                     isCover: processedImages.length === 0
                 });
             }
-            catch (err) {
-                console.log(`Erro ao processar imagem: ${err}`);
-            }
+            catch (err) { }
         }
         const createDto = {
             title: title,
@@ -333,17 +377,21 @@ let PropertiesService = class PropertiesService {
             privateArea,
             showOnSite: true,
             isExclusive: false,
-            condoFee: 0,
-            iptuPrice: 0,
             propertyFeatures: uniquePropertyFeatures,
             developmentFeatures: uniqueDevelopmentFeatures,
             images: processedImages,
-            address: {
-                street: "Importado", number: "S/N", neighborhood: "Centro",
-                city: "Balneário Camboriú", state: "SC", zipCode: "88330-000"
-            }
+            address: addressData
         };
         return this.create(createDto);
+    }
+    mapStateToAbbreviation(fullStateName) {
+        if (!fullStateName)
+            return 'SC';
+        const states = {
+            'Santa Catarina': 'SC', 'Rio Grande do Sul': 'RS', 'Paraná': 'PR', 'São Paulo': 'SP',
+            'Rio de Janeiro': 'RJ', 'Minas Gerais': 'MG', 'Bahia': 'BA', 'Distrito Federal': 'DF'
+        };
+        return states[fullStateName] || fullStateName || 'SC';
     }
 };
 exports.PropertiesService = PropertiesService;

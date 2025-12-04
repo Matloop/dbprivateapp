@@ -231,9 +231,7 @@ export declare class PropertiesController {
         id: number;
         addressId: number | null;
     }>;
-    importDwv(body: {
-        url: string;
-    }): Promise<{
+    importDwv(body: any): Promise<{
         address: {
             number: string;
             id: number;

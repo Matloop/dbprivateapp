@@ -230,7 +230,7 @@ export declare class PropertiesService {
         id: number;
         addressId: number | null;
     }>;
-    importFromDwv(dwvUrl: string): Promise<{
+    importFromDwv(inputText: string): Promise<{
         address: {
             number: string;
             id: number;
@@ -290,4 +290,5 @@ export declare class PropertiesService {
         id: number;
         addressId: number | null;
     }>;
+    private mapStateToAbbreviation;
 }

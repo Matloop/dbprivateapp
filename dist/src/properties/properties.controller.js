@@ -46,7 +46,14 @@ let PropertiesController = class PropertiesController {
         return this.propertiesService.remove(+id);
     }
     async importDwv(body) {
-        return this.propertiesService.importFromDwv(body.url);
+        if (!body || !body.url) {
+            throw new common_1.BadRequestException("O corpo da requisição deve conter { url: 'texto...' }");
+        }
+        const inputText = body.url;
+        if (typeof inputText !== 'string') {
+            throw new common_1.BadRequestException("O campo 'url' deve ser um texto.");
+        }
+        return this.propertiesService.importFromDwv(inputText);
     }
 };
 exports.PropertiesController = PropertiesController;
