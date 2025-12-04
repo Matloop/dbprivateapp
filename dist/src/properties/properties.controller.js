@@ -20,24 +20,30 @@ const create_property_dto_1 = require("./dto/create-property.dto");
 const update_property_dto_1 = require("./dto/update-property.dto");
 const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const scraper_service_1 = require("./scraper/scraper.service");
 let PropertiesController = class PropertiesController {
     propertiesService;
-    constructor(propertiesService) {
+    scraperService;
+    constructor(propertiesService, scraperService) {
         this.propertiesService = propertiesService;
+        this.scraperService = scraperService;
     }
     create(createPropertyDto) {
         return this.propertiesService.create(createPropertyDto);
     }
-    async findAll(query) {
-        console.time('AUTH_ATE_CONTROLLER');
-        console.log('1. Passou pelo Auth Guard');
-        const result = await this.propertiesService.findAll();
-        console.log('2. Prisma retornou dados');
-        console.timeEnd('AUTH_ATE_CONTROLLER');
+    findAll(query) {
         return this.propertiesService.findAll(query);
     }
+    async triggerScraper() {
+        this.scraperService.scrapeLegacySystem();
+        return { message: "Robô iniciado! Verifique o terminal do Backend." };
+    }
     findOne(id) {
-        return this.propertiesService.findOne(+id);
+        const numId = Number(id);
+        if (isNaN(numId)) {
+            throw new common_1.BadRequestException(`ID inválido: ${id}`);
+        }
+        return this.propertiesService.findOne(numId);
     }
     update(id, updatePropertyDto) {
         return this.propertiesService.update(+id, updatePropertyDto);
@@ -46,14 +52,10 @@ let PropertiesController = class PropertiesController {
         return this.propertiesService.remove(+id);
     }
     async importDwv(body) {
-        if (!body || !body.url) {
-            throw new common_1.BadRequestException("O corpo da requisição deve conter { url: 'texto...' }");
+        if (!body || !body.url || typeof body.url !== 'string') {
+            throw new common_1.BadRequestException("Envie { url: 'texto...' }");
         }
-        const inputText = body.url;
-        if (typeof inputText !== 'string') {
-            throw new common_1.BadRequestException("O campo 'url' deve ser um texto.");
-        }
-        return this.propertiesService.importFromDwv(inputText);
+        return this.propertiesService.importFromDwv(body.url);
     }
 };
 exports.PropertiesController = PropertiesController;
@@ -73,8 +75,15 @@ __decorate([
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('trigger-scraper'),
+    openapi.ApiResponse({ status: 200 }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], PropertiesController.prototype, "triggerScraper", null);
 __decorate([
     (0, common_1.Get)(':id'),
     openapi.ApiResponse({ status: 200, type: Object }),
@@ -84,6 +93,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "findOne", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Patch)(':id'),
     openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
@@ -93,6 +103,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "update", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Delete)(':id'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
@@ -111,6 +122,6 @@ __decorate([
 exports.PropertiesController = PropertiesController = __decorate([
     (0, swagger_1.ApiTags)('Imóveis'),
     (0, common_1.Controller)('properties'),
-    __metadata("design:paramtypes", [properties_service_1.PropertiesService])
+    __metadata("design:paramtypes", [properties_service_1.PropertiesService, scraper_service_1.ScraperService])
 ], PropertiesController);
 //# sourceMappingURL=properties.controller.js.map

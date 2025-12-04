@@ -60,53 +60,39 @@ let PropertiesService = class PropertiesService {
         this.prisma = prisma;
     }
     async create(createPropertyDto) {
-        const { address, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = createPropertyDto;
+        const { address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = createPropertyDto;
         return await this.prisma.property.create({
             data: {
                 ...propertyData,
-                garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
                 price: Number(propertyData.price),
                 privateArea: Number(propertyData.privateArea),
+                totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
+                garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
                 constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
-                address: address ? {
-                    create: { ...address }
+                address: address ? { create: { ...address } } : undefined,
+                roomFeatures: (roomFeatures && roomFeatures.length > 0) ? {
+                    connectOrCreate: roomFeatures.map(name => ({ where: { name }, create: { name } }))
                 } : undefined,
                 propertyFeatures: (propertyFeatures && propertyFeatures.length > 0) ? {
-                    connectOrCreate: propertyFeatures.map((name) => ({
-                        where: { name: name },
-                        create: { name: name },
-                    })),
+                    connectOrCreate: propertyFeatures.map(name => ({ where: { name }, create: { name } }))
                 } : undefined,
                 developmentFeatures: (developmentFeatures && developmentFeatures.length > 0) ? {
-                    connectOrCreate: developmentFeatures.map((name) => ({
-                        where: { name: name },
-                        create: { name: name },
-                    })),
+                    connectOrCreate: developmentFeatures.map(name => ({ where: { name }, create: { name } }))
                 } : undefined,
                 images: (images && images.length > 0) ? {
-                    createMany: {
-                        data: images.map((img) => ({
-                            url: img.url,
-                            isCover: img.isCover || false,
-                        })),
-                    },
+                    createMany: { data: images.map(img => ({ url: img.url, isCover: img.isCover || false })) }
                 } : undefined,
                 paymentConditions: (paymentConditions && paymentConditions.length > 0) ? {
-                    createMany: {
-                        data: paymentConditions.map((cond) => ({
-                            description: cond.description,
-                            value: cond.value,
-                        })),
-                    },
+                    createMany: { data: paymentConditions.map(c => ({ description: c.description, value: c.value })) }
                 } : undefined,
             },
             include: {
                 address: true,
+                roomFeatures: true,
                 propertyFeatures: true,
                 developmentFeatures: true,
-                images: true,
-                paymentConditions: true,
+                images: true
             }
         });
     }
@@ -115,63 +101,40 @@ let PropertiesService = class PropertiesService {
         if (filters?.search) {
             const searchVal = filters.search.trim();
             if (!isNaN(Number(searchVal))) {
-                where.id = Number(searchVal);
+                where.OR = [{ id: Number(searchVal) }];
             }
             else {
                 where.OR = [
                     { title: { contains: searchVal, mode: 'insensitive' } },
-                    { buildingName: { contains: searchVal, mode: 'insensitive' } }
+                    { buildingName: { contains: searchVal, mode: 'insensitive' } },
+                    { oldRef: { contains: searchVal, mode: 'insensitive' } }
                 ];
             }
         }
-        if (filters?.city) {
-            where.address = {
-                ...where.address,
-                city: { contains: filters.city, mode: 'insensitive' }
-            };
-        }
-        if (filters?.neighborhood) {
-            where.address = {
-                ...where.address,
-                neighborhood: { contains: filters.neighborhood, mode: 'insensitive' }
-            };
-        }
-        if (filters?.minPrice || filters?.maxPrice) {
-            where.price = {};
-            if (filters.minPrice)
-                where.price.gte = Number(filters.minPrice);
-            if (filters.maxPrice)
-                where.price.lte = Number(filters.maxPrice);
-        }
+        if (filters?.city)
+            where.address = { ...where.address, city: { contains: filters.city, mode: 'insensitive' } };
+        if (filters?.neighborhood)
+            where.address = { ...where.address, neighborhood: { contains: filters.neighborhood, mode: 'insensitive' } };
+        if (filters?.minPrice)
+            where.price = { ...where.price, gte: Number(filters.minPrice) };
+        if (filters?.maxPrice)
+            where.price = { ...where.price, lte: Number(filters.maxPrice) };
         if (filters?.minArea || filters?.maxArea) {
-            where.OR = [
-                {
-                    totalArea: {
-                        gte: filters.minArea ? Number(filters.minArea) : undefined,
-                        lte: filters.maxArea ? Number(filters.maxArea) : undefined,
-                    }
-                },
-                {
-                    privateArea: {
-                        gte: filters.minArea ? Number(filters.minArea) : undefined,
-                        lte: filters.maxArea ? Number(filters.maxArea) : undefined,
-                    }
-                }
-            ];
+            where.privateArea = {};
+            if (filters.minArea)
+                where.privateArea.gte = Number(filters.minArea);
+            if (filters.maxArea)
+                where.privateArea.lte = Number(filters.maxArea);
         }
-        if (filters?.bedrooms)
-            where.bedrooms = { gte: Number(filters.bedrooms) };
         if (filters?.garageSpots)
             where.garageSpots = { gte: Number(filters.garageSpots) };
+        if (filters?.bedrooms)
+            where.bedrooms = { gte: Number(filters.bedrooms) };
         if (filters?.types) {
             const types = Array.isArray(filters.types) ? filters.types : [filters.types];
             const cleanTypes = types.filter((t) => t !== '');
-            if (cleanTypes.length > 0) {
+            if (cleanTypes.length > 0)
                 where.category = { in: cleanTypes };
-            }
-        }
-        if (filters?.stage) {
-            where.constructionStage = filters.stage;
         }
         if (filters?.negotiation) {
             const negs = Array.isArray(filters.negotiation) ? filters.negotiation : [filters.negotiation];
@@ -184,58 +147,55 @@ let PropertiesService = class PropertiesService {
             if (negs.includes('veiculo'))
                 where.acceptsVehicle = true;
         }
+        if (filters?.stage)
+            where.constructionStage = filters.stage;
         return this.prisma.property.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             select: {
-                id: true,
-                title: true,
-                price: true,
-                category: true,
-                status: true,
-                bedrooms: true,
-                bathrooms: true,
-                garageSpots: true,
-                privateArea: true,
-                totalArea: true,
-                badgeText: true,
-                badgeColor: true,
-                buildingName: true,
+                id: true, title: true, price: true, category: true, status: true,
+                bedrooms: true, bathrooms: true, garageSpots: true,
+                privateArea: true, totalArea: true,
+                badgeText: true, badgeColor: true, buildingName: true,
                 constructionStage: true,
-                address: {
-                    select: { city: true, neighborhood: true, state: true }
-                },
+                address: { select: { city: true, neighborhood: true, state: true } },
                 images: {
-                    where: { isCover: true },
-                    take: 1,
-                    select: { url: true }
-                }
+                    take: 20,
+                    select: { url: true, isCover: true },
+                    orderBy: { isCover: 'desc' }
+                },
+                createdAt: true, updatedAt: true
             }
         });
     }
     async findOne(id) {
+        if (!id || isNaN(id)) {
+            throw new common_1.NotFoundException(`ID inválido fornecido.`);
+        }
         const property = await this.prisma.property.findUnique({
             where: { id },
             include: {
                 address: true,
                 images: true,
+                roomFeatures: true,
                 propertyFeatures: true,
                 developmentFeatures: true,
                 paymentConditions: true
             }
         });
         if (!property)
-            throw new common_1.NotFoundException(`Imóvel ${id} não encontrado`);
+            throw new common_1.NotFoundException(`Imóvel #${id} não encontrado`);
         return property;
     }
     async update(id, updatePropertyDto) {
         await this.findOne(id);
-        const { id: _id, createdAt: _created, updatedAt: _updated, addressId: _addrId, address, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
+        const { id: _id, addressId, createdAt, updatedAt, address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, ...propertyData } = updatePropertyDto;
         return this.prisma.property.update({
             where: { id: Number(id) },
             data: {
                 ...propertyData,
                 price: propertyData.price ? Number(propertyData.price) : undefined,
+                promotionalPrice: propertyData.promotionalPrice ? Number(propertyData.promotionalPrice) : undefined,
                 condoFee: propertyData.condoFee ? Number(propertyData.condoFee) : undefined,
                 iptuPrice: propertyData.iptuPrice ? Number(propertyData.iptuPrice) : undefined,
                 bedrooms: propertyData.bedrooms ? Number(propertyData.bedrooms) : undefined,
@@ -249,81 +209,76 @@ let PropertiesService = class PropertiesService {
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
                 address: address ? {
                     upsert: {
-                        create: { ...address },
-                        update: { ...address },
+                        create: {
+                            street: address.street,
+                            number: address.number,
+                            neighborhood: address.neighborhood,
+                            city: address.city,
+                            state: address.state,
+                            zipCode: address.zipCode,
+                            complement: address.complement
+                        },
+                        update: {
+                            street: address.street,
+                            number: address.number,
+                            neighborhood: address.neighborhood,
+                            city: address.city,
+                            state: address.state,
+                            zipCode: address.zipCode,
+                            complement: address.complement
+                        },
                     },
+                } : undefined,
+                roomFeatures: roomFeatures ? {
+                    set: [],
+                    connectOrCreate: roomFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
                 } : undefined,
                 propertyFeatures: propertyFeatures ? {
                     set: [],
-                    connectOrCreate: propertyFeatures.map((f) => ({
-                        where: { name: f },
-                        create: { name: f },
-                    })),
+                    connectOrCreate: propertyFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
                 } : undefined,
                 developmentFeatures: developmentFeatures ? {
                     set: [],
-                    connectOrCreate: developmentFeatures.map((f) => ({
-                        where: { name: f },
-                        create: { name: f },
-                    })),
-                } : undefined,
-                paymentConditions: paymentConditions ? {
-                    deleteMany: {},
-                    createMany: {
-                        data: paymentConditions.map((p) => ({
-                            description: p.description,
-                            value: p.value
-                        }))
-                    }
+                    connectOrCreate: developmentFeatures.map((f) => ({ where: { name: f }, create: { name: f } }))
                 } : undefined,
                 images: images ? {
                     deleteMany: {},
                     createMany: {
                         data: images.map((img) => ({
                             url: img.url,
-                            isCover: img.isCover || false,
-                        })),
-                        skipDuplicates: true
-                    },
+                            isCover: img.isCover || false
+                        }))
+                    }
                 } : undefined,
             },
             include: {
                 address: true,
+                roomFeatures: true,
                 propertyFeatures: true,
                 developmentFeatures: true,
-                images: true,
-                paymentConditions: true,
-            },
+                images: true
+            }
         });
     }
     async remove(id) {
         await this.findOne(id);
-        return this.prisma.property.delete({
-            where: { id }
-        });
+        return this.prisma.property.delete({ where: { id } });
     }
     async importFromDwv(inputText) {
         console.log(`--- PROCESSANDO IMPORTAÇÃO ---`);
-        if (!inputText || typeof inputText !== 'string') {
-            throw new Error("Texto de entrada inválido.");
-        }
+        if (!inputText || typeof inputText !== 'string')
+            throw new Error("Entrada inválida.");
         const lines = inputText.split(/\r?\n|\s+/);
         const dwvUrl = lines.find(line => line && line.includes('http'));
         if (!dwvUrl)
             throw new Error("Link não encontrado.");
-        let addressText = inputText
-            .replace(dwvUrl, '')
-            .replace(/\n/g, ' ')
-            .trim();
+        let addressText = inputText.replace(dwvUrl, '').replace(/\n/g, ' ').trim();
         addressText = addressText.replace(/,\s*-/, ',').trim();
-        console.log(`URL: ${dwvUrl}`);
-        console.log(`Endereço Texto: ${addressText}`);
         const numberMatch = addressText.match(/(\d+)/);
         const manualNumber = numberMatch ? numberMatch[0] : 'S/N';
         let manualStreet = addressText.split(',')[0];
-        if (manualNumber !== 'S/N') {
+        if (manualNumber !== 'S/N')
             manualStreet = manualStreet.replace(manualNumber, '').trim();
-        }
         let addressData = {
             street: manualStreet || 'Importado (Verificar)',
             number: manualNumber,
@@ -334,28 +289,23 @@ let PropertiesService = class PropertiesService {
         };
         if (addressText.length > 5) {
             try {
-                console.log("Buscando endereço na API...");
                 const query = `${addressText}, Brasil`;
                 const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`;
-                const { data: geoJson } = await axios_1.default.get(geoUrl, {
-                    headers: { 'User-Agent': 'RealEstateApp/1.0' },
-                    timeout: 5000
-                });
+                const { data: geoJson } = await axios_1.default.get(geoUrl, { headers: { 'User-Agent': 'App/1.0' }, timeout: 5000 });
                 if (geoJson && geoJson.length > 0) {
                     const info = geoJson[0].address;
-                    console.log("API Encontrou:", info);
                     addressData = {
-                        street: info.road || info.pedestrian || manualStreet,
+                        street: info.road || manualStreet,
                         number: info.house_number || manualNumber,
-                        neighborhood: info.suburb || info.neighbourhood || info.quarter || 'Centro',
-                        city: info.city || info.town || info.village || 'Balneário Camboriú',
-                        state: this.mapStateToAbbreviation(info.state) || 'SC',
+                        neighborhood: info.suburb || info.neighbourhood || 'Centro',
+                        city: info.city || info.town || 'Balneário Camboriú',
+                        state: 'SC',
                         zipCode: info.postcode ? info.postcode.replace('-', '') : '88330000'
                     };
                 }
             }
-            catch (error) {
-                console.error("Geolocalização falhou. Usando dados manuais.");
+            catch (e) {
+                console.error("Geolocalização falhou.");
             }
         }
         const uploadDir = path.join(process.cwd(), 'uploads');
@@ -370,7 +320,7 @@ let PropertiesService = class PropertiesService {
             html = data;
         }
         catch (e) {
-            throw new Error("Erro ao baixar o site do DWV.");
+            throw new Error("Erro ao acessar DWV.");
         }
         const $ = cheerio.load(html);
         const building = $('h2').first().text().trim();
@@ -379,11 +329,10 @@ let PropertiesService = class PropertiesService {
         let price = 0;
         $('h1, h2, h3').each((_, el) => {
             const txt = $(el).text();
-            if (txt.includes('R$') && price === 0) {
+            if (txt.includes('R$') && price === 0)
                 price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
-            }
         });
-        let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0;
+        let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0, totalArea = 0;
         $('div').each((_, el) => {
             const label = $(el).find('p, span, small').text().toLowerCase();
             const valueTxt = $(el).find('h2, h3, strong').text().replace(',', '.');
@@ -397,84 +346,66 @@ let PropertiesService = class PropertiesService {
                     garageSpots = value;
                 if (label.includes('privati'))
                     privateArea = value;
+                if (label.includes('total'))
+                    totalArea = value;
             }
         });
-        const propertyFeatures = [];
+        const rawFeatures = [];
+        $('li, p, span').each((_, item) => {
+            const feat = $(item).text().trim();
+            if (feat.length > 2 && !feat.includes('R$') && !feat.includes(':'))
+                rawFeatures.push(feat);
+        });
+        const allText = rawFeatures.join(' ').toLowerCase() + ' ' + html.toLowerCase();
+        const isFurnished = allText.includes('mobiliado') && !allText.includes('semimobiliado');
+        const isSeaFront = allText.includes('frente mar') || allText.includes('frente para o mar');
+        const isHighStandard = allText.includes('alto padrão');
         const developmentFeatures = [];
-        $('h3, h4, h5, h6, strong, p').each((_, el) => {
-            const text = $(el).text().toLowerCase().trim();
-            const isUnitSection = text.includes('apartamento') || text.includes('imóvel') || text.includes('unidade');
-            const isDevSection = text.includes('empreendimento') || text.includes('lazer') || text.includes('condomínio');
-            if (isUnitSection || isDevSection) {
-                let $nextContainer = $(el).next();
-                if (!$nextContainer.is('ul') && !$nextContainer.is('div'))
-                    $nextContainer = $nextContainer.next();
-                const items = [];
-                $nextContainer.find('li, p, span').each((_, item) => {
-                    const feat = $(item).text().trim();
-                    if (feat.length > 2 && !feat.includes('R$'))
-                        items.push(feat);
-                });
-                if (isUnitSection)
-                    propertyFeatures.push(...items);
-                else if (isDevSection)
-                    developmentFeatures.push(...items);
+        const propertyFeatures = [];
+        rawFeatures.forEach(f => {
+            const lower = f.toLowerCase();
+            if (['piscina', 'academia', 'salão', 'elevador', 'gerador'].some(k => lower.includes(k))) {
+                developmentFeatures.push(f);
+            }
+            else if (['sacada', 'piso', 'teto', 'cozinha', 'suíte'].some(k => lower.includes(k))) {
+                propertyFeatures.push(f);
             }
         });
-        const uniquePropertyFeatures = [...new Set(propertyFeatures)];
-        const uniqueDevelopmentFeatures = [...new Set(developmentFeatures)];
         const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
         const matches = html.match(regex) || [];
-        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25);
-        const urlsToProcess = uniqueUrls.slice(0, 20);
+        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('logo') && u.length > 25).slice(0, 20);
         const processedImages = [];
-        for (let i = 0; i < urlsToProcess.length; i++) {
+        for (const url of uniqueUrls) {
             try {
-                const response = await axios_1.default.get(urlsToProcess[i], { responseType: 'arraybuffer', timeout: 5000 });
-                const buffer = Buffer.from(response.data);
-                if (buffer.length < 5000)
-                    continue;
-                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.webp`;
+                const response = await axios_1.default.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+                const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 1000)}.webp`;
                 const filePath = path.join(uploadDir, randomName);
-                await (0, sharp_1.default)(buffer)
-                    .resize(1280, 960, { fit: 'inside', withoutEnlargement: true })
-                    .webp({ quality: 80 })
-                    .toFile(filePath);
-                processedImages.push({
-                    url: `http://127.0.0.1:3000/uploads/${randomName}`,
-                    isCover: processedImages.length === 0
-                });
+                await (0, sharp_1.default)(response.data).resize(1280, 960, { fit: 'inside' }).webp({ quality: 80 }).toFile(filePath);
+                processedImages.push({ url: `http://127.0.0.1:3000/uploads/${randomName}`, isCover: processedImages.length === 0 });
             }
             catch (err) { }
         }
         const createDto = {
             title: title,
             subtitle: building,
+            buildingName: building,
             description: `Importado via DWV: ${dwvUrl}`,
             category: create_property_dto_1.PropertyCategory.APARTAMENTO,
             transactionType: create_property_dto_1.TransactionType.VENDA,
-            price: price,
-            bedrooms,
-            suites,
-            garageSpots,
-            privateArea,
+            status: create_property_dto_1.PropertyStatus.DISPONIVEL,
+            constructionStage: create_property_dto_1.ConstructionStage.PRONTO,
+            price, bedrooms, suites, garageSpots, privateArea, totalArea,
             showOnSite: true,
             isExclusive: false,
-            propertyFeatures: uniquePropertyFeatures,
-            developmentFeatures: uniqueDevelopmentFeatures,
+            isFurnished,
+            isSeaFront,
+            isHighStandard,
+            propertyFeatures: [...new Set(propertyFeatures)],
+            developmentFeatures: [...new Set(developmentFeatures)],
             images: processedImages,
             address: addressData
         };
         return this.create(createDto);
-    }
-    mapStateToAbbreviation(fullStateName) {
-        if (!fullStateName)
-            return 'SC';
-        const states = {
-            'Santa Catarina': 'SC', 'Rio Grande do Sul': 'RS', 'Paraná': 'PR', 'São Paulo': 'SP',
-            'Rio de Janeiro': 'RJ', 'Minas Gerais': 'MG', 'Bahia': 'BA', 'Distrito Federal': 'DF'
-        };
-        return states[fullStateName] || fullStateName || 'SC';
     }
 };
 exports.PropertiesService = PropertiesService;

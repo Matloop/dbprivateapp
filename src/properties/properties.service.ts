@@ -1,284 +1,203 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { CreatePropertyDto, PropertyCategory, TransactionType } from './dto/create-property.dto';
+import { CreatePropertyDto, PropertyCategory, TransactionType, PropertyStatus, ConstructionStage } from './dto/create-property.dto';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
 import axios from 'axios'; 
 
-interface FilterOptions {
-  city?: string;
-  neighborhood?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  minArea?: number;
-  maxArea?: number;
-  bedrooms?: number;
-  garageSpots?: number;
-  types?: string[]; // Array de categorias (APARTAMENTO, CASA...)
-  negotiation?: string[]; // ['permuta', 'financiamento', 'exclusivo']
-  stage?: string; // 'PRONTO', 'EM_OBRA'...
-}
-
 @Injectable()
 export class PropertiesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // ===========================================================================
-  // CREATE
-  // ===========================================================================
+  // ========================== CREATE ==========================
   async create(createPropertyDto: CreatePropertyDto) {
     const {
       address,
-      propertyFeatures,      // Privativas
-      developmentFeatures,   // Comuns
-      images,
-      paymentConditions,
-      constructionStartDate,
-      deliveryDate,
+      roomFeatures, propertyFeatures, developmentFeatures,
+      images, paymentConditions, constructionStartDate, deliveryDate,
       ...propertyData
     } = createPropertyDto;
 
     return await this.prisma.property.create({
       data: {
         ...propertyData,
-        // Conversão de segurança
-        garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
         price: Number(propertyData.price),
         privateArea: Number(propertyData.privateArea),
+        totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
+        garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
         
         constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
-        deliveryDate : deliveryDate ? new Date(deliveryDate) : undefined,
+        deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
 
-        address: address ? {
-          create: { ...address }
+        address: address ? { create: { ...address } } : undefined,
+
+        roomFeatures: (roomFeatures && roomFeatures.length > 0) ? {
+          connectOrCreate: roomFeatures.map(name => ({ where: { name }, create: { name } }))
         } : undefined,
 
-        // 1. Features Privativas
         propertyFeatures: (propertyFeatures && propertyFeatures.length > 0) ? {
-          connectOrCreate: propertyFeatures.map((name) => ({
-            where: { name: name },
-            create: { name: name },
-          })),
+          connectOrCreate: propertyFeatures.map(name => ({ where: { name }, create: { name } }))
         } : undefined,
 
-        // 2. Features do Empreendimento
         developmentFeatures: (developmentFeatures && developmentFeatures.length > 0) ? {
-          connectOrCreate: developmentFeatures.map((name) => ({
-            where: { name: name },
-            create: { name: name },
-          })),
+          connectOrCreate: developmentFeatures.map(name => ({ where: { name }, create: { name } }))
         } : undefined,
 
         images: (images && images.length > 0) ? {
-          createMany: {
-            data: images.map((img) => ({
-              url: img.url,
-              isCover: img.isCover || false,
-            })),
-          },
+          createMany: { data: images.map(img => ({ url: img.url, isCover: img.isCover || false })) }
         } : undefined,
 
         paymentConditions: (paymentConditions && paymentConditions.length > 0) ? {
-          createMany: {
-            data: paymentConditions.map((cond) => ({
-              description: cond.description,
-              value: cond.value,
-            })),
-          },
+          createMany: { data: paymentConditions.map(c => ({ description: c.description, value: c.value })) }
         } : undefined,
       },
       include: {
         address: true,
+        roomFeatures: true,
         propertyFeatures: true,
         developmentFeatures: true,
-        images: true,
-        paymentConditions: true,
+        images: true
       }
     });
   }
 
-  // ===========================================================================
-  // FIND ALL
-  // ===========================================================================
+  // ========================== FIND ALL ==========================
   async findAll(filters?: any) {
     const where: any = {};
 
-    // --- 1. Busca por Texto (Referência ou Título) ---
     if (filters?.search) {
       const searchVal = filters.search.trim();
-      
-      // Se for número, busca por ID
       if (!isNaN(Number(searchVal))) {
-        where.id = Number(searchVal);
+        where.OR = [ { id: Number(searchVal) } ];
       } else {
-        // Se for texto, busca em Título OU Edifício
         where.OR = [
           { title: { contains: searchVal, mode: 'insensitive' } },
-          { buildingName: { contains: searchVal, mode: 'insensitive' } } // <--- ADICIONE ISSO
+          { buildingName: { contains: searchVal, mode: 'insensitive' } },
+          { oldRef: { contains: searchVal, mode: 'insensitive' } }
         ];
       }
     }
 
-    // --- 2. Localização ---
-    if (filters?.city) {
-      where.address = { 
-        ...where.address, // Mantém filtros anteriores de endereço se houver
-        city: { contains: filters.city, mode: 'insensitive' } 
-      };
-    }
+    if (filters?.city) where.address = { ...where.address, city: { contains: filters.city, mode: 'insensitive' } };
+    if (filters?.neighborhood) where.address = { ...where.address, neighborhood: { contains: filters.neighborhood, mode: 'insensitive' } };
+
+    if (filters?.minPrice) where.price = { ...where.price, gte: Number(filters.minPrice) };
+    if (filters?.maxPrice) where.price = { ...where.price, lte: Number(filters.maxPrice) };
     
-    // Filtro de Bairro (opcional, se vier do front)
-    if (filters?.neighborhood) {
-      where.address = { 
-        ...where.address,
-        neighborhood: { contains: filters.neighborhood, mode: 'insensitive' } 
-      };
-    }
-
-    // --- 3. Faixa de Preço ---
-    if (filters?.minPrice || filters?.maxPrice) {
-      where.price = {};
-      if (filters.minPrice) where.price.gte = Number(filters.minPrice);
-      if (filters.maxPrice) where.price.lte = Number(filters.maxPrice);
-    }
-
-    // --- 4. Áreas (Privativa e Total) ---
-    // Nota: O front manda 'minArea' (geralmente privativa ou total, decida qual filtrar)
-    // Aqui vou filtrar pela Área Total se ela existir, ou Privativa
     if (filters?.minArea || filters?.maxArea) {
-      where.OR = [
-        {
-          totalArea: {
-            gte: filters.minArea ? Number(filters.minArea) : undefined,
-            lte: filters.maxArea ? Number(filters.maxArea) : undefined,
-          }
-        },
-        {
-          privateArea: {
-            gte: filters.minArea ? Number(filters.minArea) : undefined,
-            lte: filters.maxArea ? Number(filters.maxArea) : undefined,
-          }
-        }
-      ];
+      where.privateArea = {}; 
+      if (filters.minArea) where.privateArea.gte = Number(filters.minArea);
+      if (filters.maxArea) where.privateArea.lte = Number(filters.maxArea);
     }
 
-    // --- 5. Dormitórios e Vagas ---
-    if (filters?.bedrooms) where.bedrooms = { gte: Number(filters.bedrooms) };
     if (filters?.garageSpots) where.garageSpots = { gte: Number(filters.garageSpots) };
+    if (filters?.bedrooms) where.bedrooms = { gte: Number(filters.bedrooms) };
 
-    // --- 6. Tipo de Imóvel (Array) ---
-    // O front manda ?types=CASA&types=APARTAMENTO
     if (filters?.types) {
       const types = Array.isArray(filters.types) ? filters.types : [filters.types];
-      // Garante que o array não tenha strings vazias
       const cleanTypes = types.filter((t: string) => t !== '');
-      if (cleanTypes.length > 0) {
-        where.category = { in: cleanTypes };
-      }
+      if (cleanTypes.length > 0) where.category = { in: cleanTypes };
     }
 
-    // --- 7. Estágio da Obra ---
-    if (filters?.stage) {
-      where.constructionStage = filters.stage; // Espera: 'LANCAMENTO', 'EM_OBRA', 'PRONTO'
-    }
-
-    // --- 8. Negociação (Mapeamento Complexo) ---
-    // O front manda array de strings: ['exclusivo', 'permuta', 'financiamento']
-    // O banco tem colunas booleanas separadas.
     if (filters?.negotiation) {
       const negs = Array.isArray(filters.negotiation) ? filters.negotiation : [filters.negotiation];
-      
       if (negs.includes('exclusivo')) where.isExclusive = true;
       if (negs.includes('permuta')) where.acceptsTrade = true;
       if (negs.includes('financiamento')) where.acceptsFinancing = true;
       if (negs.includes('veiculo')) where.acceptsVehicle = true;
     }
 
+    if (filters?.stage) where.constructionStage = filters.stage;
+
     return this.prisma.property.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      // Trazendo todos os campos necessários para o Card
       select: {
-        id: true,
-        title: true,
-        price: true,
-        category: true,
-        status: true,
-        bedrooms: true,
-        bathrooms: true,
-        garageSpots: true,
-        privateArea: true,
-        totalArea: true,
-        badgeText: true,
-        badgeColor: true,
-        buildingName: true,
+        id: true, title: true, price: true, category: true, status: true,
+        bedrooms: true, bathrooms: true, garageSpots: true,
+        privateArea: true, totalArea: true,
+        badgeText: true, badgeColor: true, buildingName: true,
         constructionStage: true,
-        address: {
-          select: { city: true, neighborhood: true, state: true }
+        address: { select: { city: true, neighborhood: true, state: true } },
+        images: { 
+          take: 20, // Traz até 5 imagens (opcional, para não pesar)
+          select: { url: true, isCover: true },
+          orderBy: { isCover: 'desc' } // Capa primeiro
         },
-        images: {
-          where: { isCover: true },
-          take: 1,
-          select: { url: true }
-        }
+        createdAt: true, updatedAt: true
       }
     });
   }
 
-  // ===========================================================================
-  // FIND ONE
-  // ===========================================================================
+  // ========================== FIND ONE ==========================
   async findOne(id: number) {
+    // Validação extra de segurança
+    if (!id || isNaN(id)) {
+       throw new NotFoundException(`ID inválido fornecido.`);
+    }
+
     const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
         address: true,
         images: true,
-        propertyFeatures: true,    // Traz a lista separada
-        developmentFeatures: true, // Traz a lista separada
+        roomFeatures: true,
+        propertyFeatures: true,
+        developmentFeatures: true,
         paymentConditions: true
       }
     });
 
-    if (!property) throw new NotFoundException(`Imóvel ${id} não encontrado`);
+    if (!property) throw new NotFoundException(`Imóvel #${id} não encontrado`);
+    
     return property;
   }
 
+  // ========================== UPDATE ==========================
   // ===========================================================================
-  // UPDATE
+  // UPDATE (CORRIGIDO)
   // ===========================================================================
   async update(id: number, updatePropertyDto: any) {
+    // 1. Verifica se existe
     await this.findOne(id);
 
+    // 2. Separa os dados. 
+    // IMPORTANTE: Adicionei 'addressId' e 'id' na desestruturação para removê-los do 'propertyData'
     const {
-      id: _id,
-      createdAt: _created,
-      updatedAt: _updated,
-      addressId: _addrId,
-      address,
-      propertyFeatures,      // Novo array
-      developmentFeatures,   // Novo array
-      images,
-      paymentConditions,
-      constructionStartDate,
-      deliveryDate,
-      ...propertyData
+      id: _id,             // Remove ID para não tentar atualizar a PK
+      addressId,           // <--- REMOVE addressId (O ERRO ESTAVA AQUI)
+      createdAt,           // Remove datas de sistema
+      updatedAt,           // Remove datas de sistema
+      address, 
+      roomFeatures, 
+      propertyFeatures, 
+      developmentFeatures,
+      images, 
+      paymentConditions, 
+      constructionStartDate, 
+      deliveryDate, 
+      ...propertyData      // O resto vai para o banco
     } = updatePropertyDto;
 
     return this.prisma.property.update({
       where: { id: Number(id) },
       data: {
         ...propertyData,
+        
+        // Conversões de segurança (String -> Number/Date)
         price: propertyData.price ? Number(propertyData.price) : undefined,
+        promotionalPrice: propertyData.promotionalPrice ? Number(propertyData.promotionalPrice) : undefined,
         condoFee: propertyData.condoFee ? Number(propertyData.condoFee) : undefined,
         iptuPrice: propertyData.iptuPrice ? Number(propertyData.iptuPrice) : undefined,
+        
         bedrooms: propertyData.bedrooms ? Number(propertyData.bedrooms) : undefined,
         suites: propertyData.suites ? Number(propertyData.suites) : undefined,
         bathrooms: propertyData.bathrooms ? Number(propertyData.bathrooms) : undefined,
         garageSpots: propertyData.garageSpots ? Number(propertyData.garageSpots) : undefined,
+        
         privateArea: propertyData.privateArea ? Number(propertyData.privateArea) : undefined,
         totalArea: propertyData.totalArea ? Number(propertyData.totalArea) : undefined,
         garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
@@ -286,117 +205,92 @@ export class PropertiesService {
         constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
         deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
 
+        // Relacionamento Endereço
         address: address ? {
           upsert: {
-            create: { ...address },
-            update: { ...address },
+            create: { 
+              street: address.street,
+              number: address.number,
+              neighborhood: address.neighborhood,
+              city: address.city,
+              state: address.state,
+              zipCode: address.zipCode,
+              complement: address.complement
+            },
+            update: { 
+              street: address.street,
+              number: address.number,
+              neighborhood: address.neighborhood,
+              city: address.city,
+              state: address.state,
+              zipCode: address.zipCode,
+              complement: address.complement
+            },
           },
         } : undefined,
 
-        // Atualiza Property Features (Privativas)
+        // Listas (Limpa e Reconecta)
+        roomFeatures: roomFeatures ? {
+          set: [], 
+          connectOrCreate: roomFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } }))
+        } : undefined,
+
         propertyFeatures: propertyFeatures ? {
-          set: [], // Limpa relações antigas
-          connectOrCreate: propertyFeatures.map((f: string) => ({
-            where: { name: f },
-            create: { name: f },
-          })),
+          set: [], 
+          connectOrCreate: propertyFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } }))
         } : undefined,
 
-        // Atualiza Development Features (Comuns)
         developmentFeatures: developmentFeatures ? {
-          set: [], // Limpa relações antigas
-          connectOrCreate: developmentFeatures.map((f: string) => ({
-            where: { name: f },
-            create: { name: f },
-          })),
+          set: [], 
+          connectOrCreate: developmentFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } }))
         } : undefined,
 
-        paymentConditions: paymentConditions ? {
-          deleteMany: {},
-          createMany: {
-            data: paymentConditions.map((p: any) => ({
-              description: p.description,
-              value: p.value
-            }))
-          }
-        } : undefined,
-        
+        // Imagens
         images: images ? {
-          deleteMany: {}, // Substituição total da galeria
-          createMany: {
-            data: images.map((img: any) => ({
-              url: img.url,
-              isCover: img.isCover || false,
-            })),
-            skipDuplicates: true
-          },
+          deleteMany: {},
+          createMany: { 
+            data: images.map((img: any) => ({ 
+              url: img.url, 
+              isCover: img.isCover || false 
+            })) 
+          }
         } : undefined,
       },
       include: {
         address: true,
+        roomFeatures: true,
         propertyFeatures: true,
         developmentFeatures: true,
-        images: true,
-        paymentConditions: true,
-      },
+        images: true
+      }
     });
   }
 
-  // ===========================================================================
-  // REMOVE
-  // ===========================================================================
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.property.delete({
-      where : { id }
-    });
+    return this.prisma.property.delete({ where : { id } });
   }
 
   // ===========================================================================
-  // IMPORTAR DO DWV
-  // ===========================================================================
-  // ===========================================================================
-  // IMPORTAR DO DWV (ATUALIZADO COM SEPARAÇÃO DE CARACTERÍSTICAS)
+  // IMPORTAR DO DWV (CORRIGIDA)
   // ===========================================================================
   async importFromDwv(inputText: string) {
     console.log(`--- PROCESSANDO IMPORTAÇÃO ---`);
 
-    if (!inputText || typeof inputText !== 'string') {
-        throw new Error("Texto de entrada inválido.");
-    }
+    if (!inputText || typeof inputText !== 'string') throw new Error("Entrada inválida.");
 
-    // 1. SEPARAR URL DO ENDEREÇO
     const lines = inputText.split(/\r?\n|\s+/); 
     const dwvUrl = lines.find(line => line && line.includes('http'));
-    
     if (!dwvUrl) throw new Error("Link não encontrado.");
 
-    // Limpa o texto para sobrar só o endereço
-    let addressText = inputText
-      .replace(dwvUrl, '')
-      .replace(/\n/g, ' ')
-      .trim();
-    
-    // Remove traços soltos no final ou começo (ex: "Avenida 10, - Bal...")
+    let addressText = inputText.replace(dwvUrl, '').replace(/\n/g, ' ').trim();
     addressText = addressText.replace(/,\s*-/, ',').trim();
 
-    console.log(`URL: ${dwvUrl}`);
-    console.log(`Endereço Texto: ${addressText}`);
-
-    // --- LÓGICA NOVA: EXTRAÇÃO MANUAL DE NÚMERO E RUA ---
-    // Tenta achar um número no texto (ex: 3151)
     const numberMatch = addressText.match(/(\d+)/);
     const manualNumber = numberMatch ? numberMatch[0] : 'S/N';
-
-    // Tenta achar a rua (tudo antes do número ou da vírgula)
     let manualStreet = addressText.split(',')[0];
-    if (manualNumber !== 'S/N') {
-        // Se achou número, remove ele do nome da rua
-        manualStreet = manualStreet.replace(manualNumber, '').trim();
-    }
-    // -----------------------------------------------------
+    if (manualNumber !== 'S/N') manualStreet = manualStreet.replace(manualNumber, '').trim();
 
-    // 2. GEOLOCALIZAÇÃO (API)
     let addressData = {
       street: manualStreet || 'Importado (Verificar)',
       number: manualNumber,
@@ -408,38 +302,23 @@ export class PropertiesService {
 
     if (addressText.length > 5) {
       try {
-        console.log("Buscando endereço na API...");
-        // Adiciona "Brasil" na busca para garantir
         const query = `${addressText}, Brasil`;
         const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=1`;
-        
-        const { data: geoJson } = await axios.get(geoUrl, {
-          headers: { 'User-Agent': 'RealEstateApp/1.0' },
-          timeout: 5000
-        });
-
+        const { data: geoJson } = await axios.get(geoUrl, { headers: { 'User-Agent': 'App/1.0' }, timeout: 5000 });
         if (geoJson && geoJson.length > 0) {
           const info = geoJson[0].address;
-          console.log("API Encontrou:", info);
-
-          // LÓGICA HÍBRIDA:
-          // Se a API trouxe o número, usa o da API. Se não, usa o que extraímos do texto (manualNumber).
-          // Se a API trouxe a rua, usa a da API. Se não, usa a manual.
           addressData = {
-            street: info.road || info.pedestrian || manualStreet,
+            street: info.road || manualStreet,
             number: info.house_number || manualNumber, 
-            neighborhood: info.suburb || info.neighbourhood || info.quarter || 'Centro',
-            city: info.city || info.town || info.village || 'Balneário Camboriú',
-            state: this.mapStateToAbbreviation(info.state) || 'SC',
+            neighborhood: info.suburb || info.neighbourhood || 'Centro',
+            city: info.city || info.town || 'Balneário Camboriú',
+            state: 'SC',
             zipCode: info.postcode ? info.postcode.replace('-', '') : '88330000'
           };
         }
-      } catch (error) {
-        console.error("Geolocalização falhou. Usando dados manuais.");
-      }
+      } catch (e) { console.error("Geolocalização falhou."); }
     }
 
-    // 3. SCRAPING (DWV) - RESTO DO CÓDIGO IGUAL
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -450,13 +329,9 @@ export class PropertiesService {
         timeout: 10000
       });
       html = data;
-    } catch (e) {
-      throw new Error("Erro ao baixar o site do DWV.");
-    }
+    } catch (e) { throw new Error("Erro ao acessar DWV."); }
 
     const $ = cheerio.load(html);
-
-    // Extração de Dados
     const building = $('h2').first().text().trim();
     const unit = $('p').first().text().trim();
     const title = building ? `${building} ${unit}` : ($('title').text() || "Imóvel DWV");
@@ -464,12 +339,10 @@ export class PropertiesService {
     let price = 0;
     $('h1, h2, h3').each((_, el) => {
       const txt = $(el).text();
-      if (txt.includes('R$') && price === 0) {
-        price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
-      }
+      if (txt.includes('R$') && price === 0) price = parseFloat(txt.replace(/[^\d,]/g, '').replace(',', '.'));
     });
 
-    let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0;
+    let bedrooms = 0, suites = 0, garageSpots = 0, privateArea = 0, totalArea = 0;
     $('div').each((_, el) => {
       const label = $(el).find('p, span, small').text().toLowerCase();
       const valueTxt = $(el).find('h2, h3, strong').text().replace(',', '.');
@@ -479,94 +352,75 @@ export class PropertiesService {
         if (label.includes('suítes')) suites = value;
         if (label.includes('vagas')) garageSpots = value;
         if (label.includes('privati')) privateArea = value;
+        if (label.includes('total')) totalArea = value;
       }
     });
 
-    // Features
-    const propertyFeatures: string[] = [];
+    const rawFeatures: string[] = [];
+    $('li, p, span').each((_, item) => {
+        const feat = $(item).text().trim();
+        if (feat.length > 2 && !feat.includes('R$') && !feat.includes(':')) rawFeatures.push(feat);
+    });
+    
+    const allText = rawFeatures.join(' ').toLowerCase() + ' ' + html.toLowerCase();
+
+    // BOOLEANOS MÁGICOS
+    const isFurnished = allText.includes('mobiliado') && !allText.includes('semimobiliado');
+    const isSeaFront = allText.includes('frente mar') || allText.includes('frente para o mar');
+    const isHighStandard = allText.includes('alto padrão');
+
     const developmentFeatures: string[] = [];
-    $('h3, h4, h5, h6, strong, p').each((_, el) => {
-      const text = $(el).text().toLowerCase().trim();
-      const isUnitSection = text.includes('apartamento') || text.includes('imóvel') || text.includes('unidade');
-      const isDevSection = text.includes('empreendimento') || text.includes('lazer') || text.includes('condomínio');
-
-      if (isUnitSection || isDevSection) {
-        let $nextContainer = $(el).next();
-        if (!$nextContainer.is('ul') && !$nextContainer.is('div')) $nextContainer = $nextContainer.next();
-        
-        const items: string[] = [];
-        $nextContainer.find('li, p, span').each((_, item) => {
-            const feat = $(item).text().trim();
-            if (feat.length > 2 && !feat.includes('R$')) items.push(feat);
-        });
-        if (isUnitSection) propertyFeatures.push(...items);
-        else if (isDevSection) developmentFeatures.push(...items);
-      }
+    const propertyFeatures: string[] = [];
+    
+    rawFeatures.forEach(f => {
+        const lower = f.toLowerCase();
+        if (['piscina', 'academia', 'salão', 'elevador', 'gerador'].some(k => lower.includes(k))) {
+            developmentFeatures.push(f);
+        } else if (['sacada', 'piso', 'teto', 'cozinha', 'suíte'].some(k => lower.includes(k))) {
+            propertyFeatures.push(f);
+        }
     });
 
-    const uniquePropertyFeatures = [...new Set(propertyFeatures)];
-    const uniqueDevelopmentFeatures = [...new Set(developmentFeatures)];
-
-    // Imagens (WebP)
     const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
     const matches = html.match(regex) || [];
-    const uniqueUrls = [...new Set(matches)].filter(u => 
-        !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25
-    );
-    const urlsToProcess = uniqueUrls.slice(0, 20);
+    const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('logo') && u.length > 25).slice(0, 20);
     const processedImages: { url: string; isCover: boolean }[] = [];
 
-    for (let i = 0; i < urlsToProcess.length; i++) {
+    for (const url of uniqueUrls) {
       try {
-        const response = await axios.get(urlsToProcess[i], { responseType: 'arraybuffer', timeout: 5000 });
-        const buffer = Buffer.from(response.data);
-        if (buffer.length < 5000) continue;
-
-        const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 10000)}.webp`;
+        const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+        const randomName = `img-${Date.now()}-${Math.floor(Math.random() * 1000)}.webp`;
         const filePath = path.join(uploadDir, randomName);
-
-        await sharp(buffer)
-          .resize(1280, 960, { fit: 'inside', withoutEnlargement: true })
-          .webp({ quality: 80 })
-          .toFile(filePath);
-
-        processedImages.push({
-            url: `http://127.0.0.1:3000/uploads/${randomName}`,
-            isCover: processedImages.length === 0 
-        });
+        await sharp(response.data).resize(1280, 960, { fit: 'inside' }).webp({ quality: 80 }).toFile(filePath);
+        processedImages.push({ url: `http://127.0.0.1:3000/uploads/${randomName}`, isCover: processedImages.length === 0 });
       } catch (err) {}
     }
 
-    // Salvar
     const createDto: CreatePropertyDto = {
       title: title,
       subtitle: building,
+      buildingName: building,
       description: `Importado via DWV: ${dwvUrl}`,
       category: PropertyCategory.APARTAMENTO,
       transactionType: TransactionType.VENDA,
-      price: price,
-      bedrooms,
-      suites,
-      garageSpots,
-      privateArea,
+      status: PropertyStatus.DISPONIVEL, // Agora existe no banco
+      constructionStage: ConstructionStage.PRONTO,
+      
+      price, bedrooms, suites, garageSpots, privateArea, totalArea,
+      
       showOnSite: true,
       isExclusive: false,
-      propertyFeatures: uniquePropertyFeatures,
-      developmentFeatures: uniqueDevelopmentFeatures,
+      isFurnished,
+      isSeaFront,
+      isHighStandard,
+      
+      propertyFeatures: [...new Set(propertyFeatures)],
+      developmentFeatures: [...new Set(developmentFeatures)],
+      
       images: processedImages,
-      address: addressData // Usando o endereço híbrido
+      address: addressData
     };
 
     return this.create(createDto);
-  }
-
-  // --- HELPER DE ESTADOS ---
-  private mapStateToAbbreviation(fullStateName: string): string {
-    if (!fullStateName) return 'SC';
-    const states: { [key: string]: string } = {
-        'Santa Catarina': 'SC', 'Rio Grande do Sul': 'RS', 'Paraná': 'PR', 'São Paulo': 'SP',
-        'Rio de Janeiro': 'RJ', 'Minas Gerais': 'MG', 'Bahia': 'BA', 'Distrito Federal': 'DF'
-    };
-    return states[fullStateName] || fullStateName || 'SC';
   }
 }

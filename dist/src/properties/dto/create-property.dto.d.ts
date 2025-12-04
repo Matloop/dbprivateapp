@@ -19,7 +19,13 @@ export declare enum PropertyStatus {
     DISPONIVEL = "DISPONIVEL",
     RESERVADO = "RESERVADO",
     VENDIDO = "VENDIDO",
-    ALUGADO = "ALUGADO"
+    ALUGADO = "ALUGADO",
+    NAO_DISPONIVEL = "NAO_DISPONIVEL"
+}
+export declare enum ConstructionStage {
+    LANCAMENTO = "LANCAMENTO",
+    EM_OBRA = "EM_OBRA",
+    PRONTO = "PRONTO"
 }
 declare class CreateAddressDto {
     street: string;
@@ -41,20 +47,47 @@ declare class CreatePaymentConditionDto {
 export declare class CreatePropertyDto {
     title: string;
     subtitle?: string;
+    oldRef?: string;
     category: PropertyCategory;
     transactionType?: TransactionType;
-    isExclusive: boolean;
-    showOnSite: boolean;
+    status?: PropertyStatus;
+    constructionStage?: ConstructionStage;
+    isSale?: boolean;
+    isRentAnnual?: boolean;
+    isRentSeason?: boolean;
+    isRentStudent?: boolean;
+    isExclusive?: boolean;
+    showOnSite?: boolean;
+    hasSign?: boolean;
+    isSeaFront?: boolean;
+    isSeaQuadra?: boolean;
+    isDifferentiated?: boolean;
+    isHighStandard?: boolean;
+    isFurnished?: boolean;
+    isSemiFurnished?: boolean;
+    isUnfurnished?: boolean;
+    acceptsTrade?: boolean;
+    acceptsFinancing?: boolean;
+    acceptsVehicle?: boolean;
+    acceptsConstructionFinancing?: boolean;
+    isMcmv?: boolean;
+    badgeText?: string;
+    badgeColor?: string;
     buildingName?: string;
-    exclusivityDocUrl?: string;
-    registrationNumber?: string;
+    condoManager?: string;
+    buildingAdministrator?: string;
+    constructionCompany?: string;
     price: number;
+    promotionalPrice?: number;
     condoFee?: number;
     iptuPrice?: number;
     bedrooms?: number;
     suites?: number;
     bathrooms?: number;
     garageSpots?: number;
+    garageType?: string;
+    solarPosition?: string;
+    relativePosition?: string;
     privateArea: number;
     totalArea?: number;
     garageArea?: number;
@@ -62,12 +95,19 @@ export declare class CreatePropertyDto {
     deliveryDate?: Date;
     description?: string;
     brokerNotes?: string;
-    status?: PropertyStatus;
-    address?: CreateAddressDto;
+    registrationNumber?: string;
+    exclusivityDocUrl?: string;
+    ownerName?: string;
+    ownerPhone?: string;
+    ownerEmail?: string;
+    keysLocation?: string;
+    exclusivitySigned?: boolean;
+    videoUrl?: string;
+    tourUrl?: string;
+    roomFeatures?: string[];
     propertyFeatures?: string[];
-    badgeText?: string;
-    badgeColor?: string;
     developmentFeatures?: string[];
+    address?: CreateAddressDto;
     images?: CreateImageDto[];
     paymentConditions?: CreatePaymentConditionDto[];
 }

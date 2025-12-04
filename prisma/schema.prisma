@@ -32,77 +32,8 @@ enum PropertyStatus {
   DISPONIVEL
   RESERVADO
   VENDIDO
-  ALUGADO
-}
-
-// --- MODELO PRINCIPAL ---
-model Property {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  badgeText  String? // Texto da tarja (Ex: "DECORADO CENTRO SUL")
-  badgeColor String? // Cor Hexadecimal ou Enum (Ex: "#007bff" ou "BLUE")
-
-  showOnSite  Boolean
-  isExclusive Boolean
-
-  buildingName String?
-
-  // Infos Básicas
-  title             String
-  subtitle          String?
-  category          PropertyCategory
-  transactionType   TransactionType  @default(VENDA)
-  exclusivityDocUrl String?
-
-  acceptsTrade     Boolean @default(false) // Aceita permuta
-  acceptsFinancing Boolean @default(false) // Aceita financiamento
-  acceptsVehicle   Boolean @default(false)
-
-  // Localização
-  address   Address? @relation(fields: [addressId], references: [id])
-  addressId Int?     @unique
-
-  // Datas
-  constructionStartDate DateTime?
-  deliveryDate          DateTime?
-  constructionStage     ConstructionStage? @default(PRONTO)
-
-  // Numéricos
-  bedrooms    Int @default(0)
-  suites      Int @default(0)
-  bathrooms   Int @default(0)
-  garageSpots Int @default(0)
-
-  registrationNumber String?
-
-  // Áreas
-  garageArea  Float?
-  privateArea Float
-  totalArea   Float?
-
-  // Valores
-  price     Decimal  @db.Decimal(15, 2)
-  condoFee  Decimal? @db.Decimal(10, 2)
-  iptuPrice Decimal? @db.Decimal(10, 2)
-
-  // Textos
-  description String?        @db.Text
-  brokerNotes String?        @db.Text
-  status      PropertyStatus @default(DISPONIVEL)
-
-  // --- NOVOS RELACIONAMENTOS DE CARACTERÍSTICAS ---
-
-  // Características da Unidade (ex: Mobiliado, Churrasqueira a carvão)
-  propertyFeatures PropertyFeature[]
-
-  // Características do Empreendimento (ex: Piscina, Academia, Cinema)
-  developmentFeatures DevelopmentFeature[]
-
-  // Outros Relacionamentos
-  images            PropertyImage[]
-  paymentConditions PaymentCondition[]
+  NAO_DISPONIVEL // Novo
+  ALUGADO        // Novo
 }
 
 enum ConstructionStage {
@@ -111,7 +42,119 @@ enum ConstructionStage {
   PRONTO
 }
 
-// --- ENDEREÇO ---
+// --- MODELO PRINCIPAL ---
+model Property {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Identificação
+  title             String
+  subtitle          String?
+  oldRef            String? 
+  category          PropertyCategory
+  transactionType   TransactionType  @default(VENDA)
+  registrationNumber String?
+  exclusivityDocUrl String?
+
+  // --- FINALIDADE (Novos) ---
+  isSale          Boolean @default(true)
+  isRentAnnual    Boolean @default(false)
+  isRentSeason    Boolean @default(false)
+  isRentStudent   Boolean @default(false)
+
+  // --- CONFIGURAÇÃO ---
+  showOnSite  Boolean @default(true)
+  isExclusive Boolean @default(false)
+  hasSign     Boolean @default(false) // Placa
+
+  // --- DESTAQUES / CARACTERÍSTICAS IMPORTANTES ---
+  isSeaFront       Boolean @default(false) // Frente Mar
+  isSeaQuadra      Boolean @default(false) // Quadra Mar
+  isDifferentiated Boolean @default(false) // Diferenciado
+  isHighStandard   Boolean @default(false) // Alto Padrão
+  isFurnished      Boolean @default(false) // Mobiliado
+  isSemiFurnished  Boolean @default(false) // Semimobiliado
+  isUnfurnished    Boolean @default(false) // Sem Mobília
+
+  // --- TARJA ---
+  badgeText  String? 
+  badgeColor String? 
+
+  // --- DADOS EDIFÍCIO ---
+  buildingName String?
+  condoManager          String? // Síndico
+  buildingAdministrator String? // Administradora
+  constructionCompany   String? // Construtora
+
+  // --- DETALHES TÉCNICOS ---
+  solarPosition    String? // Norte, Sul...
+  relativePosition String? // Frente, Fundos...
+  garageType       String? // Privativa, Rotativa
+
+  // --- MULTIMÍDIA ---
+  videoUrl String?
+  tourUrl  String?
+
+  // --- DADOS PRIVADOS ---
+  ownerName         String?
+  ownerPhone        String?
+  ownerEmail        String?
+  keysLocation      String?
+  exclusivitySigned Boolean @default(false)
+  brokerNotes       String? @db.Text
+
+  // --- NEGOCIAÇÃO ---
+  price             Decimal  @db.Decimal(15, 2)
+  promotionalPrice  Decimal? @db.Decimal(15, 2)
+  condoFee          Decimal? @db.Decimal(10, 2)
+  iptuPrice         Decimal? @db.Decimal(10, 2)
+  
+  acceptsTrade                 Boolean @default(false)
+  acceptsFinancing             Boolean @default(false)
+  acceptsVehicle               Boolean @default(false)
+  acceptsConstructionFinancing Boolean @default(false) // Novo
+  isMcmv                       Boolean @default(false)
+
+  // Datas
+  constructionStartDate DateTime?
+  deliveryDate          DateTime?
+  constructionStage     ConstructionStage? @default(PRONTO)
+  
+  // Numéricos
+  bedrooms    Int @default(0)
+  suites      Int @default(0)
+  bathrooms   Int @default(0)
+  garageSpots Int @default(0)
+  status PropertyStatus @default(DISPONIVEL)
+  // Áreas
+  garageArea  Float?
+  privateArea Float
+  totalArea   Float?
+
+  // Textos
+  description String? @db.Text
+
+  // --- RELACIONAMENTOS (LISTAS) ---
+  
+  // 1. Ambientes (Cozinha Americana, Living...)
+  roomFeatures RoomFeature[]
+
+  // 2. Características do Imóvel (Gesso, Ar Split...)
+  propertyFeatures PropertyFeature[]
+
+  // 3. Infraestrutura do Empreendimento (Piscina, Academia...)
+  developmentFeatures DevelopmentFeature[]
+
+  // Outros
+  images            PropertyImage[]
+  paymentConditions PaymentCondition[]
+  address           Address? @relation(fields: [addressId], references: [id])
+  addressId         Int?     @unique
+}
+
+// --- TABELAS AUXILIARES ---
+
 model Address {
   id           Int     @id @default(autoincrement())
   state        String
@@ -121,47 +164,44 @@ model Address {
   number       String
   complement   String?
   zipCode      String
-
-  property Property?
+  property     Property?
 }
 
-// --- IMAGENS ---
 model PropertyImage {
-  id      Int     @id @default(autoincrement())
-  url     String
-  isCover Boolean @default(false)
-
+  id         Int      @id @default(autoincrement())
+  url        String
+  isCover    Boolean  @default(false)
   propertyId Int
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
-// --- NOVAS TABELAS DE CARACTERÍSTICAS ---
+// Listas de Características (Muitos-para-Muitos Implícito)
+model RoomFeature {
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
+  properties Property[]
+}
 
-// 1. Privativas (Do Imóvel)
 model PropertyFeature {
   id         Int        @id @default(autoincrement())
   name       String     @unique
   properties Property[]
 }
 
-// 2. Comuns (Do Empreendimento)
 model DevelopmentFeature {
   id         Int        @id @default(autoincrement())
   name       String     @unique
   properties Property[]
 }
 
-// --- CONDIÇÕES DE PAGAMENTO ---
 model PaymentCondition {
   id          Int      @id @default(autoincrement())
   description String
   value       Decimal? @db.Decimal(15, 2)
-
-  propertyId Int
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  propertyId  Int
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 }
 
-// --- USUÁRIO (Auth) ---
 model User {
   id        String   @id @db.Uuid
   email     String   @unique
