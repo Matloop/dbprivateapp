@@ -121,6 +121,8 @@ let PropertiesService = class PropertiesService {
                 category: true,
                 status: true,
                 createdAt: true,
+                badgeText: true,
+                badgeColor: true,
                 address: {
                     select: { city: true, state: true, neighborhood: true }
                 },

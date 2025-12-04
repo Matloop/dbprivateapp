@@ -41,6 +41,9 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  badgeText   String?  // Texto da tarja (Ex: "DECORADO CENTRO SUL")
+  badgeColor  String?  // Cor Hexadecimal ou Enum (Ex: "#007bff" ou "BLUE")
+
   showOnSite   Boolean 
   isExclusive  Boolean
 

@@ -38,6 +38,8 @@ export declare class PropertiesController {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -66,6 +68,8 @@ export declare class PropertiesController {
     }>;
     findAll(): Promise<{
         createdAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -116,6 +120,8 @@ export declare class PropertiesController {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -176,6 +182,8 @@ export declare class PropertiesController {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -205,6 +213,8 @@ export declare class PropertiesController {
     remove(id: string): Promise<{
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -265,6 +275,8 @@ export declare class PropertiesController {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;

@@ -37,6 +37,8 @@ export declare class PropertiesService {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -65,6 +67,8 @@ export declare class PropertiesService {
     }>;
     findAll(): Promise<{
         createdAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         title: string;
         subtitle: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -115,6 +119,8 @@ export declare class PropertiesService {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -175,6 +181,8 @@ export declare class PropertiesService {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -204,6 +212,8 @@ export declare class PropertiesService {
     remove(id: number): Promise<{
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;
@@ -264,6 +274,8 @@ export declare class PropertiesService {
     } & {
         createdAt: Date;
         updatedAt: Date;
+        badgeText: string | null;
+        badgeColor: string | null;
         showOnSite: boolean;
         isExclusive: boolean;
         title: string;

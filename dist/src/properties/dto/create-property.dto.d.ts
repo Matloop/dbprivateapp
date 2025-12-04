@@ -64,6 +64,8 @@ export declare class CreatePropertyDto {
     status?: PropertyStatus;
     address?: CreateAddressDto;
     propertyFeatures?: string[];
+    badgeText?: string;
+    badgeColor?: string;
     developmentFeatures?: string[];
     images?: CreateImageDto[];
     paymentConditions?: CreatePaymentConditionDto[];

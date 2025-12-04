@@ -115,6 +115,14 @@ export class CreatePropertyDto {
   @IsOptional()
   propertyFeatures?: string[];
 
+  @IsString()
+  @IsOptional()
+  badgeText?: string;
+
+  @IsString()
+  @IsOptional()
+  badgeColor?: string;
+
   // Características do Empreendimento (Comuns)
   @IsArray()
   @IsString({ each: true })
