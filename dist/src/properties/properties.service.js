@@ -118,7 +118,10 @@ let PropertiesService = class PropertiesService {
                 where.id = Number(searchVal);
             }
             else {
-                where.title = { contains: searchVal, mode: 'insensitive' };
+                where.OR = [
+                    { title: { contains: searchVal, mode: 'insensitive' } },
+                    { buildingName: { contains: searchVal, mode: 'insensitive' } }
+                ];
             }
         }
         if (filters?.city) {

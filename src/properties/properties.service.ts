@@ -109,11 +109,16 @@ export class PropertiesService {
     // --- 1. Busca por Texto (Referência ou Título) ---
     if (filters?.search) {
       const searchVal = filters.search.trim();
-      // Se for número, tenta buscar por ID, senão busca por título
+      
+      // Se for número, busca por ID
       if (!isNaN(Number(searchVal))) {
         where.id = Number(searchVal);
       } else {
-        where.title = { contains: searchVal, mode: 'insensitive' };
+        // Se for texto, busca em Título OU Edifício
+        where.OR = [
+          { title: { contains: searchVal, mode: 'insensitive' } },
+          { buildingName: { contains: searchVal, mode: 'insensitive' } } // <--- ADICIONE ISSO
+        ];
       }
     }
 
