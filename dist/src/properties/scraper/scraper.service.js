@@ -25,8 +25,9 @@ let ScraperService = class ScraperService {
     async scrapeLegacySystem() {
         console.log("🚀 Iniciando Robô V14 (FULL + Tarjas Importadas)...");
         const browser = await puppeteer_1.default.launch({
-            headless: false,
+            headless: true,
             defaultViewport: null,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             userDataDir: './puppeteer_data',
             args: [
                 '--start-maximized',

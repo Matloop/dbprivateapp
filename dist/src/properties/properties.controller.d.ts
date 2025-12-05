@@ -8,9 +8,14 @@ export declare class PropertiesController {
     constructor(propertiesService: PropertiesService, scraperService: ScraperService);
     create(createPropertyDto: CreatePropertyDto): any;
     findAll(query: any): Promise<{
+        address: {
+            state: string;
+            city: string;
+            neighborhood: string;
+        } | null;
+        title: string;
         createdAt: Date;
         updatedAt: Date;
-        title: string;
         category: import(".prisma/client").$Enums.PropertyCategory;
         badgeText: string | null;
         badgeColor: string | null;
@@ -27,17 +32,22 @@ export declare class PropertiesController {
             url: string;
             isCover: boolean;
         }[];
-        address: {
-            state: string;
-            city: string;
-            neighborhood: string;
-        } | null;
         id: number;
     }[]>;
     triggerScraper(): Promise<{
         message: string;
     }>;
     findOne(id: string): Promise<{
+        address: {
+            number: string;
+            state: string;
+            id: number;
+            city: string;
+            neighborhood: string;
+            street: string;
+            complement: string | null;
+            zipCode: string;
+        } | null;
         roomFeatures: {
             id: number;
             name: string;
@@ -62,20 +72,11 @@ export declare class PropertiesController {
             propertyId: number;
             value: import("@prisma/client/runtime/library").Decimal | null;
         }[];
-        address: {
-            number: string;
-            id: number;
-            state: string;
-            city: string;
-            neighborhood: string;
-            street: string;
-            complement: string | null;
-            zipCode: string;
-        } | null;
     } & {
+        title: string;
+        suites: number;
         createdAt: Date;
         updatedAt: Date;
-        title: string;
         subtitle: string | null;
         oldRef: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -126,7 +127,6 @@ export declare class PropertiesController {
         deliveryDate: Date | null;
         constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
-        suites: number;
         bathrooms: number;
         garageSpots: number;
         status: import(".prisma/client").$Enums.PropertyStatus;
@@ -138,26 +138,27 @@ export declare class PropertiesController {
         addressId: number | null;
     }>;
     update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
-        images: {
-            id: number;
-            url: string;
-            isCover: boolean;
-            propertyId: number;
-        }[];
         address: {
             number: string;
-            id: number;
             state: string;
+            id: number;
             city: string;
             neighborhood: string;
             street: string;
             complement: string | null;
             zipCode: string;
         } | null;
+        images: {
+            id: number;
+            url: string;
+            isCover: boolean;
+            propertyId: number;
+        }[];
     } & {
+        title: string;
+        suites: number;
         createdAt: Date;
         updatedAt: Date;
-        title: string;
         subtitle: string | null;
         oldRef: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -208,7 +209,6 @@ export declare class PropertiesController {
         deliveryDate: Date | null;
         constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
-        suites: number;
         bathrooms: number;
         garageSpots: number;
         status: import(".prisma/client").$Enums.PropertyStatus;
@@ -220,9 +220,10 @@ export declare class PropertiesController {
         addressId: number | null;
     }>;
     remove(id: string): Promise<{
+        title: string;
+        suites: number;
         createdAt: Date;
         updatedAt: Date;
-        title: string;
         subtitle: string | null;
         oldRef: string | null;
         category: import(".prisma/client").$Enums.PropertyCategory;
@@ -273,7 +274,6 @@ export declare class PropertiesController {
         deliveryDate: Date | null;
         constructionStage: import(".prisma/client").$Enums.ConstructionStage | null;
         bedrooms: number;
-        suites: number;
         bathrooms: number;
         garageSpots: number;
         status: import(".prisma/client").$Enums.PropertyStatus;
