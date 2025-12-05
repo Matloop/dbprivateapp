@@ -7,7 +7,7 @@ services:
     environment:
       # IMPORTANTE: Estes dados devem ser os mesmos usados na DATABASE_URL do seu arquivo .env
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password_seguro_123 
+      POSTGRES_PASSWORD: fg08d76\a5srd987DSADAS
       POSTGRES_DB: imobiliaria
     volumes:
       - postgres_data:/var/lib/postgresql/data
