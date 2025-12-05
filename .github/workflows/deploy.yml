@@ -1,0 +1,49 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST_DNS }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            # 1. Entra na pasta
+            cd ~/dbprivateapp
+            
+            # 2. Garante permissões (resolve aquele erro de Permission Denied)
+            echo "🔧 Corrigindo permissões..."
+            sudo chown -R $USER:$USER .
+            
+            # 3. Atualiza o código forçadamente
+            echo "📥 Baixando atualizações..."
+            git fetch --all
+            git reset --hard origin/main
+            
+            # 4. Reconstrói os containers
+            echo "🐳 Recriando containers..."
+            docker compose down
+            docker compose up -d --build
+            
+            # 5. Aguarda o banco subir e atualiza tabelas
+            echo "⏳ Aguardando banco de dados..."
+            sleep 15
+            
+            echo "🗄️ Atualizando Banco de Dados..."
+            # O -T é importante para funcionar em modo não-interativo
+            docker compose exec -T api npx prisma db push
+            
+            echo "✅ Deploy Concluído com Sucesso!"
