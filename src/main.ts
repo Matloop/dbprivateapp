@@ -9,14 +9,12 @@ async function bootstrap() {
   
   // --- CONFIGURAÇÃO DO CORS ---
   app.enableCors({
-    // Permite apenas a origem definida no .env (ou localhost:5173 como fallback)
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    
-    // Métodos permitidos
+    origin: [
+      'https://dbprivateappfront-idae.vercel.app', // URL da Vercel
+      'http://localhost:5173' // Para funcionar no seu PC
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    
-    // Permite enviar Cookies e Headers de Autorização
-    credentials: true, 
+    credentials: true,
   });
 
   // Configuração da pasta de Uploads (Mantive sua lógica)
