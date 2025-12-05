@@ -1,32 +1,40 @@
+version: '3.8'
 
 services:
-  # O BANCO DE DADOS
+  # --- O BANCO DE DADOS ---
   postgres:
     image: postgres:15
     restart: always
     environment:
+      # IMPORTANTE: Estes dados devem ser os mesmos usados na DATABASE_URL do seu arquivo .env
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password_seguro_123 # Mude isso
+      POSTGRES_PASSWORD: password_seguro_123 
       POSTGRES_DB: imobiliaria
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432" # Opcional: feche isso em produção no firewall AWS
+      - "5432:5432" 
 
-  # A SUA API NESTJS
+  # --- A SUA API NESTJS ---
   api:
     build: .
     restart: always
     ports:
       - "3000:3000"
+    
+    # AQUI ESTÁ A CORREÇÃO:
+    # Isso faz o Docker ler o arquivo .env e injetar as variáveis (SUPABASE, ETC)
+    env_file:
+      - .env
+    
     environment:
-      DATABASE_URL: "postgresql://user:password_seguro_123@postgres:5432/imobiliaria?schema=public"
-      PORT: 3000
-      # Configuração para o Puppeteer no Docker
+      # Configuração específica para o Chrome/Puppeteer funcionar dentro do Docker
       PUPPETEER_EXECUTABLE_PATH: "/usr/bin/google-chrome-stable"
+      
     volumes:
-      # Persiste as imagens enviadas mesmo se reiniciar o container
+      # Persiste as imagens enviadas na pasta do servidor
       - ./uploads:/usr/src/app/uploads
+    
     depends_on:
       - postgres
 
