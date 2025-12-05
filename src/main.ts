@@ -7,7 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
-  // - CONFIGURAÇÃO DO CORS -
+  //  CONFIGURAÇÃO DO CORS 
   app.enableCors({
     origin: [
       'https://dbprivateappfront-idae.vercel.app', // URL da Vercel
