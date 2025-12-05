@@ -166,7 +166,7 @@ let PropertiesService = class PropertiesService {
                 badgeText: true, badgeColor: true, buildingName: true,
                 constructionStage: true,
                 address: { select: { city: true, neighborhood: true, state: true } },
-                images: { take: 30, select: { url: true, isCover: true }, orderBy: { isCover: 'desc' } },
+                images: { take: 1, select: { url: true, isCover: true }, orderBy: { isCover: 'desc' } },
                 createdAt: true, updatedAt: true
             }
         });
@@ -206,16 +206,8 @@ let PropertiesService = class PropertiesService {
                 deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
                 address: address ? {
                     upsert: {
-                        create: {
-                            street: address.street || '', number: address.number || 'S/N',
-                            neighborhood: address.neighborhood || '', city: address.city || '',
-                            state: address.state || 'SC', zipCode: address.zipCode || '',
-                            complement: address.complement
-                        },
-                        update: {
-                            street: address.street, number: address.number, neighborhood: address.neighborhood,
-                            city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
-                        },
+                        create: { street: address.street || '', number: address.number || 'S/N', neighborhood: address.neighborhood || '', city: address.city || '', state: address.state || 'SC', zipCode: address.zipCode || '', complement: address.complement },
+                        update: { street: address.street, number: address.number, neighborhood: address.neighborhood, city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement },
                     },
                 } : undefined,
                 roomFeatures: roomFeatures ? { set: [], connectOrCreate: roomFeatures.map((f) => ({ where: { name: f }, create: { name: f } })) } : undefined,
@@ -234,7 +226,7 @@ let PropertiesService = class PropertiesService {
         return this.prisma.property.delete({ where: { id } });
     }
     async importFromDwv(inputText) {
-        console.log(`--- IMPORT DWV START ---`);
+        console.log(`--- IMPORT DWV (FAST AXIOS) ---`);
         if (!inputText || typeof inputText !== 'string')
             throw new common_1.BadRequestException("Texto inválido.");
         const urlMatch = inputText.match(/https?:\/\/[^\s]+/);
@@ -254,7 +246,13 @@ let PropertiesService = class PropertiesService {
         street = street.replace(/[-–].*$/, '').trim();
         let html = '';
         try {
-            const response = await axios_1.default.get(dwvUrl, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120.0' }, timeout: 15000 });
+            const response = await axios_1.default.get(dwvUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml'
+                },
+                timeout: 10000
+            });
             html = response.data;
         }
         catch (e) {
@@ -298,32 +296,63 @@ let PropertiesService = class PropertiesService {
         const propertyFeatures = [];
         const developmentFeatures = [];
         const roomFeatures = [];
-        const devKeywords = ['piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'playground', 'brinquedoteca', 'quadra', 'spa', 'sauna', 'cinema', 'game', 'pub', 'bar', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet', 'coworking', 'medidores', 'gerador', 'portaria', 'zelador'];
-        const roomKeywords = ['sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço', 'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'];
-        const ignoreList = [
-            'galeria', 'torre', 'previsão', 'entrega', 'entrada', 'parcelamento', 'reforço', 'financiamento',
-            'dorm.', 'vagas', 'privativos', 'área total', 'banheiros', 'suítes', 'm²',
-            'fazer contra-proposta', 'unidade', 'empreendimento', 'gmail', 'hotmail', 'creci', 'contato', 'telefone'
+        const allPossibleFeatures = [
+            { type: 'DEV', name: 'Piscina', keys: ['piscina'] },
+            { type: 'DEV', name: 'Academia', keys: ['academia', 'fitness'] },
+            { type: 'DEV', name: 'Salão de Festas', keys: ['salão de festas'] },
+            { type: 'DEV', name: 'Sala de Jogos', keys: ['sala de jogos'] },
+            { type: 'DEV', name: 'Playground', keys: ['playground', 'brinquedoteca'] },
+            { type: 'DEV', name: 'Sauna', keys: ['sauna', 'spa'] },
+            { type: 'DEV', name: 'Cinema', keys: ['cinema'] },
+            { type: 'DEV', name: 'Quadra Esportiva', keys: ['quadra'] },
+            { type: 'DEV', name: 'Rooftop', keys: ['rooftop'] },
+            { type: 'DEV', name: 'Elevador', keys: ['elevador'] },
+            { type: 'DEV', name: 'Espaço Gourmet', keys: ['gourmet'] },
+            { type: 'DEV', name: 'Bar / Pub', keys: ['pub', 'bar'] },
+            { type: 'DEV', name: 'Pet Place', keys: ['pet'] },
+            { type: 'DEV', name: 'Coworking', keys: ['coworking'] },
+            { type: 'DEV', name: 'Heliponto', keys: ['heliponto'] },
+            { type: 'DEV', name: 'Portaria 24h', keys: ['portaria'] },
+            { type: 'DEV', name: 'Zelador', keys: ['zelador'] },
+            { type: 'DEV', name: 'Bicicletário', keys: ['bicicletário'] },
+            { type: 'DEV', name: 'Box de Praia', keys: ['box de praia'] },
+            { type: 'DEV', name: 'Gerador', keys: ['gerador'] },
+            { type: 'DEV', name: 'Hall Decorado', keys: ['hall'] },
+            { type: 'DEV', name: 'Deck', keys: ['deck'] },
+            { type: 'DEV', name: 'Lounge', keys: ['lounge'] },
+            { type: 'DEV', name: 'Acessibilidade PNE', keys: ['pne', 'acessibilidade'] },
+            { type: 'DEV', name: 'Câmeras de Segurança', keys: ['câmeras', 'monitoramento'] },
+            { type: 'ROOM', name: 'Sala de Estar', keys: ['sala de estar', 'living'] },
+            { type: 'ROOM', name: 'Sala de Jantar', keys: ['sala de jantar'] },
+            { type: 'ROOM', name: 'Cozinha', keys: ['cozinha'] },
+            { type: 'ROOM', name: 'Lavabo', keys: ['lavabo'] },
+            { type: 'ROOM', name: 'Área de Serviço', keys: ['área de serviço', 'lavanderia'] },
+            { type: 'ROOM', name: 'Sacada com Churrasqueira', keys: ['sacada', 'churrasqueira'] },
+            { type: 'ROOM', name: 'Varanda', keys: ['varanda'] },
+            { type: 'ROOM', name: 'Closet', keys: ['closet'] },
+            { type: 'ROOM', name: 'Dependência', keys: ['dependência'] },
+            { type: 'ROOM', name: 'Escritório', keys: ['escritório', 'home office'] },
+            { type: 'PROP', name: 'Acabamento em Gesso', keys: ['gesso'] },
+            { type: 'PROP', name: 'Porcelanato', keys: ['porcelanato'] },
+            { type: 'PROP', name: 'Ar Condicionado', keys: ['ar condicionado', 'split'] },
+            { type: 'PROP', name: 'Aquecimento a Gás', keys: ['aquecimento a gás', 'água quente'] },
+            { type: 'PROP', name: 'Fechadura Eletrônica', keys: ['fechadura'] },
+            { type: 'PROP', name: 'Interfone', keys: ['interfone'] },
+            { type: 'PROP', name: 'Mobiliado', keys: ['mobiliado'] },
+            { type: 'PROP', name: 'Internet', keys: ['internet', 'wifi'] },
+            { type: 'PROP', name: 'Gás Individual', keys: ['gás individual'] },
+            { type: 'PROP', name: 'Hidrômetro Individual', keys: ['hidrômetro', 'medidores'] },
         ];
-        $('li').each((_, el) => {
-            const txt = $(el).text().trim();
-            const lower = txt.toLowerCase();
-            if (txt.length < 3)
-                return;
-            if (txt.length > 60)
-                return;
-            if (txt.includes('R$'))
-                return;
-            if (ignoreList.some(badWord => lower.includes(badWord)))
-                return;
-            if (devKeywords.some(k => lower.includes(k))) {
-                developmentFeatures.push(txt);
-            }
-            else if (roomKeywords.some(k => lower.includes(k))) {
-                roomFeatures.push(txt);
-            }
-            else {
-                propertyFeatures.push(txt);
+        const lowerHtml = html.toLowerCase();
+        allPossibleFeatures.forEach(feat => {
+            const exists = feat.keys.some(k => lowerHtml.includes(k));
+            if (exists) {
+                if (feat.type === 'DEV')
+                    developmentFeatures.push(feat.name);
+                else if (feat.type === 'ROOM')
+                    roomFeatures.push(feat.name);
+                else
+                    propertyFeatures.push(feat.name);
             }
         });
         const paymentConditions = [];
@@ -340,20 +369,21 @@ let PropertiesService = class PropertiesService {
             fs.mkdirSync(uploadDir, { recursive: true });
         const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
         const matches = html.match(regex) || [];
-        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25);
-        const urlsToProcess = uniqueUrls.slice(0, 30);
+        const uniqueUrls = [...new Set(matches)].filter(u => !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && !u.includes('personal') && !u.includes('avatar') && u.length > 25);
+        const urlsToProcess = uniqueUrls.slice(0, 40);
         const processedImages = [];
         for (const url of urlsToProcess) {
             try {
                 const res = await axios_1.default.get(url, { responseType: 'arraybuffer', timeout: 5000 });
-                if (res.data.length < 5000)
+                const buffer = Buffer.from(res.data);
+                if (buffer.length < 20000)
+                    continue;
+                const metadata = await (0, sharp_1.default)(buffer).metadata();
+                if (!metadata.width || metadata.width < 800)
                     continue;
                 const fname = `dwv-${Date.now()}-${Math.floor(Math.random() * 10000)}.jpg`;
-                await (0, sharp_1.default)(res.data).resize(1280, 960, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(path.join(uploadDir, fname));
-                processedImages.push({
-                    url: `http://127.0.0.1:3000/uploads/${fname}`,
-                    isCover: processedImages.length === 0
-                });
+                await (0, sharp_1.default)(buffer).resize(1280, 960, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(path.join(uploadDir, fname));
+                processedImages.push({ url: `http://127.0.0.1:3000/uploads/${fname}`, isCover: processedImages.length === 0 });
             }
             catch { }
         }
@@ -371,14 +401,14 @@ let PropertiesService = class PropertiesService {
             description: `Importado de: ${dwvUrl}`,
             address: { street, number, neighborhood: 'Centro', city: 'Balneário Camboriú', state: 'SC', zipCode: '88330-000', complement: '' },
             buildingName: buildingName,
-            isFurnished: propertyFeatures.some(f => f.toLowerCase().includes('mobiliado')),
+            isFurnished: propertyFeatures.some(f => f.includes('Mobiliado')),
             roomFeatures: [...new Set(roomFeatures)],
             propertyFeatures: [...new Set(propertyFeatures)],
             developmentFeatures: [...new Set(developmentFeatures)],
             paymentConditions,
             images: processedImages
         };
-        console.log(`💾 Salvando: ${createDto.title} | ${processedImages.length} fotos | ${propertyFeatures.length + roomFeatures.length + developmentFeatures.length} caracteristicas`);
+        console.log(`💾 Salvando: ${createDto.title} | ${processedImages.length} fotos | ${developmentFeatures.length} infra`);
         return this.create(createDto);
     }
 };

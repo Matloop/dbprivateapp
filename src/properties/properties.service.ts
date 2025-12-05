@@ -49,6 +49,7 @@ export class PropertiesService {
           } 
         } : undefined,
 
+        // connectOrCreate: Cria a tag se ela não existir
         roomFeatures: (roomFeatures && roomFeatures.length > 0) ? {
           connectOrCreate: roomFeatures.map(name => ({ where: { name }, create: { name } }))
         } : undefined,
@@ -120,7 +121,7 @@ export class PropertiesService {
         badgeText: true, badgeColor: true, buildingName: true,
         constructionStage: true,
         address: { select: { city: true, neighborhood: true, state: true } },
-        images: { take: 30, select: { url: true, isCover: true }, orderBy: { isCover: 'desc' } },
+        images: { take: 1, select: { url: true, isCover: true }, orderBy: { isCover: 'desc' } },
         createdAt: true, updatedAt: true
       }
     });
@@ -141,13 +142,7 @@ export class PropertiesService {
   // ========================== UPDATE ==========================
   async update(id: number, updatePropertyDto: any) {
     await this.findOne(id);
-    const {
-      id: _id, addressId, createdAt, updatedAt, address, 
-      roomFeatures, propertyFeatures, developmentFeatures,
-      images, paymentConditions, constructionStartDate, deliveryDate,
-      url, ...propertyData
-    } = updatePropertyDto;
-
+    const { id: _id, addressId, createdAt, updatedAt, address, roomFeatures, propertyFeatures, developmentFeatures, images, paymentConditions, constructionStartDate, deliveryDate, url, ...propertyData } = updatePropertyDto;
     return this.prisma.property.update({
       where: { id: Number(id) },
       data: {
@@ -165,22 +160,12 @@ export class PropertiesService {
         garageArea: propertyData.garageArea ? Number(propertyData.garageArea) : undefined,
         constructionStartDate: constructionStartDate ? new Date(constructionStartDate) : undefined,
         deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
-        
         address: address ? {
           upsert: {
-            create: { 
-              street: address.street || '', number: address.number || 'S/N', 
-              neighborhood: address.neighborhood || '', city: address.city || '', 
-              state: address.state || 'SC', zipCode: address.zipCode || '', 
-              complement: address.complement
-            },
-            update: { 
-              street: address.street, number: address.number, neighborhood: address.neighborhood,
-              city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement
-            },
+            create: { street: address.street || '', number: address.number || 'S/N', neighborhood: address.neighborhood || '', city: address.city || '', state: address.state || 'SC', zipCode: address.zipCode || '', complement: address.complement },
+            update: { street: address.street, number: address.number, neighborhood: address.neighborhood, city: address.city, state: address.state, zipCode: address.zipCode, complement: address.complement },
           },
         } : undefined,
-
         roomFeatures: roomFeatures ? { set: [], connectOrCreate: roomFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } })) } : undefined,
         propertyFeatures: propertyFeatures ? { set: [], connectOrCreate: propertyFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } })) } : undefined,
         developmentFeatures: developmentFeatures ? { set: [], connectOrCreate: developmentFeatures.map((f: string) => ({ where: { name: f }, create: { name: f } })) } : undefined,
@@ -199,10 +184,10 @@ export class PropertiesService {
   }
 
   // ===========================================================================
-  // IMPORTAR DO DWV (VERSÃO FINAL: FILTRO RIGOROSO DE LIXO)
+  // IMPORTAR DO DWV (SEM PUPPETEER - AXIOS + SCAN DE TEXTO BRUTO)
   // ===========================================================================
   async importFromDwv(inputText: string) {
-    console.log(`--- IMPORT DWV START ---`);
+    console.log(`--- IMPORT DWV (FAST AXIOS) ---`);
     if (!inputText || typeof inputText !== 'string') throw new BadRequestException("Texto inválido.");
 
     const urlMatch = inputText.match(/https?:\/\/[^\s]+/);
@@ -219,16 +204,22 @@ export class PropertiesService {
     } else { street = addressText || 'Endereço não detectado'; }
     street = street.replace(/[-–].*$/, '').trim();
 
-    // 2. Fetch HTML
+    // 2. FETCH LEVE (AXIOS)
     let html = '';
     try {
-      const response = await axios.get(dwvUrl, { headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120.0' }, timeout: 15000 });
+      const response = await axios.get(dwvUrl, {
+        headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml'
+        },
+        timeout: 10000
+      });
       html = response.data;
     } catch (e) { throw new BadRequestException(`Erro DWV: ${e.message}`); }
 
     const $ = cheerio.load(html);
 
-    // 3. Dados Básicos
+    // 3. EXTRAÇÃO DADOS BÁSICOS
     let price = 0;
     $('h1, h2').each((_, el) => {
         const txt = $(el).text();
@@ -241,7 +232,7 @@ export class PropertiesService {
     if (h2Text && pTorre) buildingName = `Unidade ${h2Text} - ${pTorre}`;
     else buildingName = $('title').text().trim();
 
-    // Dados Técnicos (Ícones)
+    // 4. ÍCONES (Dorm/Vaga/Área)
     const extractByAlt = (altKeywords: string[]) => {
         let val = 0;
         $('img').each((_, el) => {
@@ -264,86 +255,125 @@ export class PropertiesService {
     const privateArea = extractByAlt(['área privada', 'privativos', 'privativa']);
     const totalArea = extractByAlt(['área total']);
 
-    // --- 4. CARACTERÍSTICAS (O PULO DO GATO) ---
+    // --- 5. CARACTERÍSTICAS (SCAN NO CÓDIGO FONTE BRUTO) ---
+    // Mesmo que o conteúdo esteja oculto em abas, ele está no JSON do Next.js
+    // Vamos procurar se as palavras-chave existem no HTML bruto.
+    
     const propertyFeatures: string[] = [];
     const developmentFeatures: string[] = [];
     const roomFeatures: string[] = [];
 
-    // Palavras-chave para categorização
-    const devKeywords = ['piscina', 'academia', 'fitness', 'salão', 'hall', 'elevador', 'playground', 'brinquedoteca', 'quadra', 'spa', 'sauna', 'cinema', 'game', 'pub', 'bar', 'rooftop', 'heliponto', 'box', 'bicicletário', 'pet', 'coworking', 'medidores', 'gerador', 'portaria', 'zelador'];
-    const roomKeywords = ['sala', 'cozinha', 'suíte', 'dormitório', 'banheiro', 'lavabo', 'área de serviço', 'sacada', 'varanda', 'living', 'closet', 'copa', 'terraço', 'dependência', 'bwc', 'quarto', 'escritório', 'home office'];
+    // Dicionário de Características para procurar (Display Name -> Search Terms)
+    const allPossibleFeatures = [
+        { type: 'DEV', name: 'Piscina', keys: ['piscina'] },
+        { type: 'DEV', name: 'Academia', keys: ['academia', 'fitness'] },
+        { type: 'DEV', name: 'Salão de Festas', keys: ['salão de festas'] },
+        { type: 'DEV', name: 'Sala de Jogos', keys: ['sala de jogos'] },
+        { type: 'DEV', name: 'Playground', keys: ['playground', 'brinquedoteca'] },
+        { type: 'DEV', name: 'Sauna', keys: ['sauna', 'spa'] },
+        { type: 'DEV', name: 'Cinema', keys: ['cinema'] },
+        { type: 'DEV', name: 'Quadra Esportiva', keys: ['quadra'] },
+        { type: 'DEV', name: 'Rooftop', keys: ['rooftop'] },
+        { type: 'DEV', name: 'Elevador', keys: ['elevador'] },
+        { type: 'DEV', name: 'Espaço Gourmet', keys: ['gourmet'] },
+        { type: 'DEV', name: 'Bar / Pub', keys: ['pub', 'bar'] },
+        { type: 'DEV', name: 'Pet Place', keys: ['pet'] },
+        { type: 'DEV', name: 'Coworking', keys: ['coworking'] },
+        { type: 'DEV', name: 'Heliponto', keys: ['heliponto'] },
+        { type: 'DEV', name: 'Portaria 24h', keys: ['portaria'] },
+        { type: 'DEV', name: 'Zelador', keys: ['zelador'] },
+        { type: 'DEV', name: 'Bicicletário', keys: ['bicicletário'] },
+        { type: 'DEV', name: 'Box de Praia', keys: ['box de praia'] },
+        { type: 'DEV', name: 'Gerador', keys: ['gerador'] },
+        { type: 'DEV', name: 'Hall Decorado', keys: ['hall'] },
+        { type: 'DEV', name: 'Deck', keys: ['deck'] },
+        { type: 'DEV', name: 'Lounge', keys: ['lounge'] },
+        { type: 'DEV', name: 'Acessibilidade PNE', keys: ['pne', 'acessibilidade'] },
+        { type: 'DEV', name: 'Câmeras de Segurança', keys: ['câmeras', 'monitoramento'] },
+        
+        { type: 'ROOM', name: 'Sala de Estar', keys: ['sala de estar', 'living'] },
+        { type: 'ROOM', name: 'Sala de Jantar', keys: ['sala de jantar'] },
+        { type: 'ROOM', name: 'Cozinha', keys: ['cozinha'] },
+        { type: 'ROOM', name: 'Lavabo', keys: ['lavabo'] },
+        { type: 'ROOM', name: 'Área de Serviço', keys: ['área de serviço', 'lavanderia'] },
+        { type: 'ROOM', name: 'Sacada com Churrasqueira', keys: ['sacada', 'churrasqueira'] },
+        { type: 'ROOM', name: 'Varanda', keys: ['varanda'] },
+        { type: 'ROOM', name: 'Closet', keys: ['closet'] },
+        { type: 'ROOM', name: 'Dependência', keys: ['dependência'] },
+        { type: 'ROOM', name: 'Escritório', keys: ['escritório', 'home office'] },
 
-    // LISTA NEGRA: Textos que NÃO queremos importar (Lixo)
-    const ignoreList = [
-        'galeria', 'torre', 'previsão', 'entrega', 'entrada', 'parcelamento', 'reforço', 'financiamento', 
-        'dorm.', 'vagas', 'privativos', 'área total', 'banheiros', 'suítes', 'm²', 
-        'fazer contra-proposta', 'unidade', 'empreendimento', 'gmail', 'hotmail', 'creci', 'contato', 'telefone'
+        { type: 'PROP', name: 'Acabamento em Gesso', keys: ['gesso'] },
+        { type: 'PROP', name: 'Porcelanato', keys: ['porcelanato'] },
+        { type: 'PROP', name: 'Ar Condicionado', keys: ['ar condicionado', 'split'] },
+        { type: 'PROP', name: 'Aquecimento a Gás', keys: ['aquecimento a gás', 'água quente'] },
+        { type: 'PROP', name: 'Fechadura Eletrônica', keys: ['fechadura'] },
+        { type: 'PROP', name: 'Interfone', keys: ['interfone'] },
+        { type: 'PROP', name: 'Mobiliado', keys: ['mobiliado'] },
+        { type: 'PROP', name: 'Internet', keys: ['internet', 'wifi'] },
+        { type: 'PROP', name: 'Gás Individual', keys: ['gás individual'] },
+        { type: 'PROP', name: 'Hidrômetro Individual', keys: ['hidrômetro', 'medidores'] },
     ];
 
-    // Foca apenas em tags <li> (List Items) que é onde as features estão
-    $('li').each((_, el) => {
-        const txt = $(el).text().trim();
-        const lower = txt.toLowerCase();
+    const lowerHtml = html.toLowerCase();
 
-        // Filtros de Limpeza
-        if (txt.length < 3) return; // Ignora letras soltas
-        if (txt.length > 60) return; // Ignora frases longas
-        if (txt.includes('R$')) return; // Ignora preços
-        if (ignoreList.some(badWord => lower.includes(badWord))) return; // Ignora lixo conhecido
-
-        // Se passou pelos filtros, é uma característica válida!
-        if (devKeywords.some(k => lower.includes(k))) {
-            developmentFeatures.push(txt);
-        } else if (roomKeywords.some(k => lower.includes(k))) {
-            roomFeatures.push(txt);
-        } else {
-            // "Acabamento em gesso", "Fechadura", "Interfone", etc caem aqui
-            propertyFeatures.push(txt);
+    // Varre o HTML inteiro procurando as palavras
+    allPossibleFeatures.forEach(feat => {
+        // Verifica se alguma das chaves existe no HTML
+        const exists = feat.keys.some(k => lowerHtml.includes(k));
+        
+        if (exists) {
+            if (feat.type === 'DEV') developmentFeatures.push(feat.name);
+            else if (feat.type === 'ROOM') roomFeatures.push(feat.name);
+            else propertyFeatures.push(feat.name);
         }
     });
 
-    // 5. Pagamento
+    // 6. Pagamento
     const paymentConditions: { description: string; value: number }[] = [];
     $('h3').each((_, el) => {
         const label = $(el).text().trim(); 
         const container = $(el).closest('div').parent(); 
         const valueText = container.find('p').first().text().trim(); 
-        
         if (['entrada', 'parcelas', 'reforço', 'financiamento'].some(k => label.toLowerCase().includes(k)) && valueText) {
             paymentConditions.push({ description: `${label}: ${valueText}`, value: 0 }); 
         }
     });
 
-    // 6. Imagens (REGEX)
+    // 7. Imagens (REGEX + FILTRO DE TAMANHO)
     const uploadDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
     const regex = /https?:\/\/[^"'\s>]+\.(?:jpg|png|jpeg|webp)/gi;
     const matches = html.match(regex) || [];
     
+    // Filtro de URLs
     const uniqueUrls = [...new Set(matches)].filter(u => 
-        !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && u.length > 25
+        !u.includes('svg') && !u.includes('icon') && !u.includes('logo') && !u.includes('personal') && !u.includes('avatar') && u.length > 25
     );
 
-    const urlsToProcess = uniqueUrls.slice(0, 30);
+    const urlsToProcess = uniqueUrls.slice(0, 40);
     const processedImages: { url: string; isCover: boolean }[] = [];
 
     for (const url of urlsToProcess) {
         try {
             const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
-            if (res.data.length < 5000) continue; 
+            const buffer = Buffer.from(res.data);
+            
+            // Filtro de Tamanho em Bytes (Ignora ícones pequenos)
+            if (buffer.length < 20000) continue; 
+
+            // Filtro de Dimensão com Sharp (Ignora logos como ON!)
+            const metadata = await sharp(buffer).metadata();
+            if (!metadata.width || metadata.width < 800) continue; 
 
             const fname = `dwv-${Date.now()}-${Math.floor(Math.random()*10000)}.jpg`;
-            await sharp(res.data).resize(1280, 960, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(path.join(uploadDir, fname));
+            await sharp(buffer).resize(1280, 960, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(path.join(uploadDir, fname));
             
-            processedImages.push({ 
-                url: `http://127.0.0.1:3000/uploads/${fname}`, 
-                isCover: processedImages.length === 0 
-            });
+            processedImages.push({ url: `http://127.0.0.1:3000/uploads/${fname}`, isCover: processedImages.length === 0 });
         } catch {}
     }
 
-    // 7. DTO Final
+    // 8. DTO Final
     let title = $('h1').first().text().trim() || $('title').text().trim();
     if (title.length > 80) title = "Imóvel Importado DWV";
 
@@ -359,9 +389,8 @@ export class PropertiesService {
         description: `Importado de: ${dwvUrl}`,
         address: { street, number, neighborhood: 'Centro', city: 'Balneário Camboriú', state: 'SC', zipCode: '88330-000', complement: '' },
         buildingName: buildingName,
-        isFurnished: propertyFeatures.some(f => f.toLowerCase().includes('mobiliado')),
+        isFurnished: propertyFeatures.some(f => f.includes('Mobiliado')),
         
-        // Remove duplicatas
         roomFeatures: [...new Set(roomFeatures)],
         propertyFeatures: [...new Set(propertyFeatures)],
         developmentFeatures: [...new Set(developmentFeatures)],
@@ -370,7 +399,7 @@ export class PropertiesService {
         images: processedImages
     };
 
-    console.log(`💾 Salvando: ${createDto.title} | ${processedImages.length} fotos | ${propertyFeatures.length + roomFeatures.length + developmentFeatures.length} caracteristicas`);
+    console.log(`💾 Salvando: ${createDto.title} | ${processedImages.length} fotos | ${developmentFeatures.length} infra`);
     return this.create(createDto);
   }
 }
