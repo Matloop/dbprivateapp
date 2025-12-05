@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Deploy via Self-Hosted Runner
 
 on:
   push:
@@ -7,43 +7,37 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # Mudamos de ubuntu-latest para self-hosted
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST_DNS }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            # 1. Entra na pasta
-            cd ~/dbprivateapp
-            
-            # 2. Garante permissões (resolve aquele erro de Permission Denied)
-            echo "🔧 Corrigindo permissões..."
-            sudo chown -R $USER:$USER .
-            
-            # 3. Atualiza o código forçadamente
-            echo "📥 Baixando atualizações..."
-            git fetch --all
-            git reset --hard origin/main
-            
-            # 4. Reconstrói os containers
-            echo "🐳 Recriando containers..."
-            docker compose down
-            docker compose up -d --build
-            
-            # 5. Aguarda o banco subir e atualiza tabelas
-            echo "⏳ Aguardando banco de dados..."
-            sleep 15
-            
-            echo "🗄️ Atualizando Banco de Dados..."
-            # O -T é importante para funcionar em modo não-interativo
-            docker compose exec -T api npx prisma db push
-            
-            echo "✅ Deploy Concluído com Sucesso!"
+      # Não precisa mais do 'appleboy/ssh-action'. 
+      # Rodamos os comandos direto no shell da máquina.
+      
+      - name: Update and Restart Docker
+        run: |
+          # Vai para a pasta do projeto (ajuste o caminho se necessário)
+          # O runner costuma fazer checkout na pasta _work dentro de actions-runner
+          # Mas como você já tem a pasta configurada com .env e volumes, vamos usar a sua pasta original:
+          
+          cd ~/dbprivateapp
+          
+          # Atualiza permissões
+          sudo chown -R $USER:$USER .
+          
+          # Atualiza código
+          git fetch --all
+          git reset --hard origin/main
+          
+          # Docker
+          docker compose down
+          docker compose up -d --build
+          
+          # Banco
+          sleep 10
+          docker compose exec -T api npx prisma db push
+          
+          echo "✅ Deploy via Runner concluído!"
