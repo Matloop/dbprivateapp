@@ -156,6 +156,12 @@ let PropertiesService = class PropertiesService {
         }
         if (filters?.stage)
             where.constructionStage = filters.stage;
+        if (filters?.ids) {
+            const idsArray = filters.ids.split(',').map((id) => Number(id.trim())).filter((n) => !isNaN(n));
+            if (idsArray.length > 0) {
+                where.id = { in: idsArray };
+            }
+        }
         return this.prisma.property.findMany({
             where,
             orderBy: { createdAt: 'desc' },
